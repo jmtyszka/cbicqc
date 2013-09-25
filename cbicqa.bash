@@ -9,10 +9,6 @@
 # Copyright 2011 California Institute of Technology
 # All rights reserved.
 
-# Localization
-user_home=/Users/jmt
-bin_dir=${user_home}/bin/CBICQA
-
 if [ $# -lt 3 ]; then
   echo "-----------------"
   echo "SYNTAX : cbicqa.bash <QA Data Directory> <QA Date-Time> <Overwrite [Y|N]>"
@@ -28,11 +24,11 @@ qa_overwrite=$3
 qa_dir=${qa_data}/${qa_date}
 
 # Full paths to commands (for XGrid if used)
-cmd_getdicom=${bin_dir}/cbicqa_getdicom.bash
-cmd_convert=${bin_dir}/cbicqa_dicom2nifti.bash
-cmd_moco=${bin_dir}/cbicqa_moco.bash
-cmd_stats=${bin_dir}/cbicqa_stats.bash
-cmd_report=${bin_dir}/cbicqa_report.bash
+cmd_getdicom=${CBICQA_ROOT}/cbicqa_getdicom.bash
+cmd_convert=${CBICQA_ROOT}/cbicqa_dicom2nifti.bash
+cmd_moco=${CBICQA_ROOT}/cbicqa_moco.bash
+cmd_stats=${CBICQA_ROOT}/cbicqa_stats.bash
+cmd_report=${CBICQA_ROOT}/cbicqa_report.bash
 
 # Check if directory already exists - if not, get data and analyze
 if [ ! -d ${qa_dir} -o ${qa_overwrite} == "Y" ]
