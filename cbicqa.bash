@@ -6,8 +6,22 @@
 # PLACE  : Caltech Brain Imaging Center
 # DATES  : 10/10/2011 JMT From scratch
 #
-# Copyright 2011 California Institute of Technology
-# All rights reserved.
+# This file is part of CBICQA.
+#
+#    CBICQA is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    CBICQA is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#   along with CBICQA.  If not, see <http://www.gnu.org/licenses/>.
+#
+# Copyright 2011-2013 California Institute of Technology.
 
 if [ $# -lt 3 ]; then
   echo "-----------------"
@@ -24,11 +38,12 @@ qa_overwrite=$3
 qa_dir=${qa_data}/${qa_date}
 
 # Full paths to commands (for XGrid if used)
-cmd_getdicom=${CBICQA_ROOT}/cbicqa_getdicom.bash
-cmd_convert=${CBICQA_ROOT}/cbicqa_dicom2nifti.bash
-cmd_moco=${CBICQA_ROOT}/cbicqa_moco.bash
-cmd_stats=${CBICQA_ROOT}/cbicqa_stats.bash
-cmd_report=${CBICQA_ROOT}/cbicqa_report.bash
+cmd_getdicom=${CBICQA_BIN}/cbicqa_getdicom.bash
+cmd_convert=${CBICQA_BIN}/cbicqa_dicom2nifti.bash
+cmd_moco=${CBICQA_BIN}/cbicqa_moco.bash
+cmd_timeseries=${CBICQA_BIN}/cbicqa_timeseries.bash
+cmd_detrend=${CBICQA_BIN}/cbicqa_detrend.py
+cmd_report=${CBICQA_BIN}/cbicqa_report.bash
 
 # Check if directory already exists - if not, get data and analyze
 if [ ! -d ${qa_dir} -o ${qa_overwrite} == "Y" ]
@@ -57,9 +72,12 @@ then
   # Motion correct QA series
   $cmd_moco $qa_dir
   
-  # Generate descriptive QA stats
-  $cmd_stats $qa_dir
-  
+  # Generate QA timeseries
+  $cmd_timeseries $qa_dir
+
+  # Detrend timeseries
+  $cmd_detrend $qa_dir
+
   # Generate HTML report and summary files
   $cmd_report $qa_dir
   

@@ -7,6 +7,23 @@
 #
 # Copyright 2012 California Institute of Technology
 # All rights reserved
+#
+# This file is part of CBICQA.
+#
+#    CBICQA is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    CBICQA is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#   along with CBICQA.  If not, see <http://www.gnu.org/licenses/>.
+#
+# Copyright 2011-2013 California Institute of Technology.
 
 if [ $# -lt 1 ]; then
   echo "Please provide a QA directory name"
@@ -25,15 +42,10 @@ qa_report=${qa_dir}/qa_report.html
 # Info summary file
 qa_summary=${qa_dir}/qa_summary.txt
 
-# Text files
-qa_timeseries=${qa_dir}/qa_timeseries.txt
+# Use detrended timeseries
+qa_timeseries=${qa_dir}/qa_timeseries_detrend.txt
 
-qa_signal_volume=${qa_dir}/qa_signal_volume.txt
-qa_signal_mean=${qa_dir}/qa_signal_mean.txt
-qa_noise_mean=${qa_dir}/qa_noise_mean.txt
-qa_noise_sd=${qa_dir}/qa_noise_sd.txt
-qa_snr=${qa_dir}/qa_snr.txt
-
+# Moco pars (MCFLIRT format)
 qa_mcf_par=${qa_dir}/qa_mcf.par
 
 # Read scan info from file
@@ -155,17 +167,8 @@ echo "<h3>Temporal Mean Image</h3><img src=qa_mean_ortho.png /><br>" >> $qa_repo
 echo "<h3>Temporal SD Image</h3><img src=qa_sd_ortho.png /><br>" >> $qa_report
 echo "<h3>Region Mask</h3><img src=qa_mask_ortho.png /><br>" >> $qa_report
 
-# Create graph images of mean regional signal timeseries
-# TODO
-fsl_tsplot -i ${qa_dir}/qa_timeseries.txt --start=1 --finish=1 -a Phantom -o ${qa_dir}/qa_phantom_ts.png
-fsl_tsplot -i ${qa_dir}/qa_timeseries.txt --start=2 --finish=2 -a Nyquist -o ${qa_dir}/qa_nyquist_ts.png
-fsl_tsplot -i ${qa_dir}/qa_timeseries.txt --start=3 --finish=3 -a Noise -o ${qa_dir}/qa_noise_ts.png
-
-# Add graphs to page
-echo "<h2>Signal and Noise</h2>
-<img src=qa_phantom_ts.png /><br>
-<img src=qa_nyquist_ts.png /><br>
-<img src=qa_noise_ts.png /><br>" >> $qa_report
+# Add timeseries plot (from detrending) to page
+echo "<h2>Signal and Noise</h2><img src=qa_detrend.png /><br>" >> $qa_report
 
 # Create translation parameter graph
 fsl_tsplot -i ${qa_dir}/qa_mcf.par -t "Translation (mm)" -a x,y,z --start=4 --finish=6 -o ${qa_dir}/qa_trans.png

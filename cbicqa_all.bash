@@ -14,11 +14,28 @@
 #          10/16/2012 JMT Add local OsiriX Q&R to get QA study data
 #          10/19/2012 JMT Add optional overwrite argument
 #
-# Copyright 2011-2012 California Institute of Technology
-# All rights reserved.
+# This file is part of CBICQA.
+#
+#    CBICQA is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    CBICQA is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#   along with CBICQA.  If not, see <http://www.gnu.org/licenses/>.
+#
+# Copyright 2011-2013 California Institute of Technology.
 
 # QA data/website directory
-qa_data="/Library/Server/Web/Data/Sites/Default/QA"
+if [ "x${CBICQA_DATA}" -eq "x" ]; then
+  echo "Environmental variable CBICQA_DATA undefined - exiting"
+  exit
+fi
 
 if [ $# -lt 1 ]; then
   overwrite="N"
@@ -28,7 +45,7 @@ fi
 
 echo "CBIC QA Analysis"
 echo "----------------"
-echo "QA Data Directory : $qa_data"
+echo "QA Data Directory : ${CBICQA_DATA}"
 
 # Query all studies on local OsiriX with PatientID = "qa"
 echo "Querying local OsiriX database for QA studies"
@@ -58,7 +75,7 @@ do
     qa_date=${qa_date/:/}
 
     # Call single study QA analysis
-    cbicqa.bash ${qa_data} ${qa_date} ${overwrite}
+    cbicqa.bash ${CBICQA_DATA} ${qa_date} ${overwrite}
    
 done
 

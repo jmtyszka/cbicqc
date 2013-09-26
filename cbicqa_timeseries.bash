@@ -1,14 +1,33 @@
 #!/bin/bash
 #
-# Calculate important QA stats for phantom QA dataset
+# Calculate ROI timeseries
+# - output to text file for further use
 #
 # AUTHOR : Mike Tyszka, Ph.D.
+# PLACE  : Caltech
 # DATES  : 09/16/2011 JMT From scratch
-#          10/03/2012 JMT Replace corner airspace mask with systematic noise estimate in artifact mask
-#          10/12/2012 JMT Use signal volume for estimating artifact volume given known phantom volume
+#          10/03/2012 JMT Replace corner airspace mask with systematic
+#                         noise estimate in artifact mask
+#          10/12/2012 JMT Use signal volume for estimating artifact volume
+#                         given known phantom volume
+#          09/25/2013 JMT Rename from cbicqa_stats to cbicqa_timeseries
 #
-# Copyright 2011-2012 California Institute of Technology.
-# All rights reserved.
+# This file is part of CBICQA.
+#
+#    CBICQA is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    CBICQA is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#   along with CBICQA.  If not, see <http://www.gnu.org/licenses/>.
+#
+# Copyright 2011-2013 California Institute of Technology.
 
 # CBIC FBIRN phantom volume in ml
 phantom_volume_ml=2500
@@ -16,7 +35,7 @@ phantom_volume_ml=2500
 # Check arguments
 if [ $# -lt 1 ]; then
   echo "Please provide a QA directory name"
-  echo "SYNTAX : cbicqa_stats.bash <QA Directory>"
+  echo "SYNTAX : cbicqa_timeseries.bash <QA Directory>"
   exit
 fi
 

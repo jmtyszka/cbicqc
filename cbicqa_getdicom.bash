@@ -1,13 +1,26 @@
 #!/bin/bash
-#
-# Single QA analysis script
+# Retrieve daily QA DICOM stack from server into local directory
 #
 # AUTHOR : Mike Tyszka, Ph.D.
 # PLACE  : Caltech Brain Imaging Center
 # DATES  : 10/10/2011 JMT From scratch
 #
-# Copyright 2011 California Institute of Technology
-# All rights reserved.
+# This file is part of CBICQA.
+#
+#    CBICQA is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    CBICQA is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#   along with CBICQA.  If not, see <http://www.gnu.org/licenses/>.
+#
+# Copyright 2011-2013 California Institute of Technology.
 
 # Local OsiriX AE Title
 osirix_aet=evendim
