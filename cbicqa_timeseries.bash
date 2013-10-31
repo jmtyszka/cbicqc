@@ -34,13 +34,14 @@ phantom_volume_ml=2500
 
 # Check arguments
 if [ $# -lt 1 ]; then
-  echo "Please provide a QA directory name"
-  echo "SYNTAX : cbicqa_timeseries.bash <QA Directory>"
+  echo "Please provide a QA date to process (in form YYYYMMDD)"
+  echo "SYNTAX : cbicqa_timeseries.bash <QA Date>"
   exit
 fi
 
 # Directory containing QA study
-qa_dir=$1
+qa_date=$1
+qa_dir=${CBICQA_DATA}/$qa_date
 
 echo "  Generating descriptive QA statistics"
 
@@ -132,6 +133,12 @@ else
     rm -rf ${qa_dir}/tmp*.*
 
 fi
+
+# Create orthogonal slice views of mean and sd images
+scale_factor=2
+slicer ${qa_dir}/qa_mean -s ${scale_factor} -a ${qa_dir}/qa_mean_ortho.png
+slicer ${qa_dir}/qa_sd -s ${scale_factor} -a ${qa_dir}/qa_sd_ortho.png
+slicer ${qa_dir}/qa_mask -s ${scale_factor} -a ${qa_dir}/qa_mask_ortho.png
 
 # Extract time-series stats within each ROI
 if [ -s ${qa_timeseries} ]; then

@@ -23,27 +23,26 @@
 #
 # Copyright 2011-2013 California Institute of Technology.
 
-if [ $# -lt 3 ]; then
+if [ $# -lt 2 ]; then
   echo "-----------------"
-  echo "SYNTAX : cbicqa.bash <QA Data Directory> <QA Date-Time> <Overwrite [Y|N]>"
-  echo "<QA Date-Time> has format: YYYYMMDD-HHMM"
+  echo "SYNTAX : cbicqa.bash <QA Date> <Overwrite [Y|N]>"
+  echo "<QA Date> has format: YYYYMMDD"
   echo "This script is designed to be called by cbicqa_all.bash, but can be run manually"
   exit
 fi
 
 # Construct QA analysis directory name
-qa_data=$1
-qa_date=$2
-qa_overwrite=$3
-qa_dir=${qa_data}/${qa_date}
+qa_date=$1
+qa_overwrite=$2
+qa_dir=${CBICQA_DATA}/${qa_date}
 
 # Full paths to commands (for XGrid if used)
 cmd_getdicom=${CBICQA_BIN}/cbicqa_getdicom.bash
 cmd_convert=${CBICQA_BIN}/cbicqa_dicom2nifti.bash
 cmd_moco=${CBICQA_BIN}/cbicqa_moco.bash
 cmd_timeseries=${CBICQA_BIN}/cbicqa_timeseries.bash
-cmd_detrend=${CBICQA_BIN}/cbicqa_detrend.py
-cmd_report=${CBICQA_BIN}/cbicqa_report.bash
+cmd_stats=${CBICQA_BIN}/cbicqa_stats.py
+cmd_report=${CBICQA_BIN}/cbicqa_report.py
 
 # Check if directory already exists - if not, get data and analyze
 if [ ! -d ${qa_dir} -o ${qa_overwrite} == "Y" ]
@@ -68,18 +67,27 @@ then
     $cmd_convert $qa_dir
 	
   fi
-  
-  # Motion correct QA series
-  $cmd_moco $qa_dir
+
+  if [ -s ${qa_dir}/qa_mcf.nii.gz ]
+  then
+
+    echo "  Motion correction has already been performed - skipping"
+
+  else
+
+    # Motion correct QA series
+    $cmd_moco $qa_dir
+
+  fi
   
   # Generate QA timeseries
-  $cmd_timeseries $qa_dir
+  $cmd_timeseries $qa_date
 
-  # Detrend timeseries
-  $cmd_detrend $qa_dir
+  # Calculate QA stats
+  $cmd_stats $qa_date
 
   # Generate HTML report and summary files
-  $cmd_report $qa_dir
+  $cmd_report $qa_date
   
   echo "  Complete"
   

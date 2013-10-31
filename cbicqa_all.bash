@@ -32,8 +32,8 @@
 # Copyright 2011-2013 California Institute of Technology.
 
 # QA data/website directory
-if [ "x${CBICQA_DATA}" -eq "x" ]; then
-  echo "Environmental variable CBICQA_DATA undefined - exiting"
+if [ -z "${CBICQA_DATA}" ]; then
+  echo "Please define CBICQA_DATA undefined - exiting"
   exit
 fi
 
@@ -75,14 +75,14 @@ do
     qa_date=${qa_date/:/}
 
     # Call single study QA analysis
-    cbicqa.bash ${CBICQA_DATA} ${qa_date} ${overwrite}
+    cbicqa.bash ${qa_date} ${overwrite}
    
 done
 
 # Compile summary report from all individual QA reports
 # Final report HTML file is in $qa_data/qa_report.html
 
-cbicqa_report_all.bash $qa_data
+cbicqa_report_all.py ${CBICQA_DATA}
 
 echo "-----------"
 echo "Done"
