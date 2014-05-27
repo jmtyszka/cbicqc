@@ -39,9 +39,8 @@ if [ $# -lt 1 ]; then
   exit
 fi
 
-# Directory containing QA study
-qa_date=$1
-qa_dir=${CBICQA_DATA}/$qa_date
+# QA series working directory
+qa_dir=$1
 
 echo "  Generating descriptive QA statistics"
 

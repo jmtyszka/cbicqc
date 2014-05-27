@@ -23,11 +23,11 @@
 # Copyright 2011-2013 California Institute of Technology.
 
 # Local OsiriX AE Title
-osirix_aet=evendim
+osirix_aet=EVENDIM
 
 # Local Osirix host name
-#osirix_hostname=evendim.caltech.edu
-osirix_hostname=127.0.0.1
+osirix_hostname=evendim.caltech.edu
+#osirix_hostname=127.0.0.1
 
 # Local Osirix port number
 osirix_port=11112
@@ -44,8 +44,11 @@ qa_dir=$1
 # Date string YYYYMMDD of current study
 qa_date=$2
 
+# Search keys used by cbicqa_scanner.bash to locate scanner QA series
+search_keys=$3
+
 # Full debug (-d) or quiet movescu
-debug=$3
+debug=$4
 
 # Temporary DICOM import directory
 qa_import=${qa_dir}/DICOM
@@ -59,5 +62,8 @@ fi
 
 # Get QA DICOM stack from OsiriX database
 echo "  Retrieving first QA study on ${qa_date} from OsiriX database"
-#movescu -aet ${movescu_aet} -aem ${movescu_aet} --port ${movescu_port} -aec ${osirix_aet} -S ${debug} -k 0008,0052="STUDY" -k PatientID="qa" -k StudyDate=${qa_date} -od ${qa_import} ${osirix_hostname} ${osirix_port}
-movescu --port ${movescu_port} -S ${debug} -k 0008,0052="STUDY" -k PatientID="qa" -k StudyDate=${qa_date} -od ${qa_import} ${osirix_hostname} ${osirix_port}
+
+# General pull of Tim32, Tim12 or 4.7T QA data
+cmd="movescu --port ${movescu_port} -S ${debug} -k 0008,0052=""STUDY"" ""${search_keys}"" -k StudyDate=${qa_date} -od ${qa_import} ${osirix_hostname} ${osirix_port}"
+# echo $cmd
+$cmd

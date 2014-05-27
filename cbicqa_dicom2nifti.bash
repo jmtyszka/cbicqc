@@ -44,7 +44,7 @@ fi
 echo "  Converting DICOM to Nifti"
 
 # Get the first filename from the DICOM import subdirectory
-dc_file=`ls -1 ${qa_dir}/DICOM/* | head -n 1`
+dc_file=`ls -1 ${qa_dir}/DICOM/MR* | head -n 1`
 
 # Generate a series info text file
 dicom_info=${qa_dir}/qa_info.txt
@@ -86,12 +86,12 @@ else
 	mri_convert ${dc_file} ${nifti_file} &> ${qa_dir}/qa_mri_convert.log
 
 	# Delete the DICOM subdirectory if conversion successful (ie qa.nii.gz file exists)
-	if [ -s ${nifti_file} ]; then
-	echo "  Removing temporary DICOM files"
-		rm -rf ${qa_dir}/DICOM
-	fi
+	# if [ -s ${nifti_file} ]; then
+	# echo "  Removing temporary DICOM files"
+	#	  rm -rf ${qa_dir}/DICOM
+	# fi
 
-    # Add number of volumes to info file
-    fslinfo ${nifti_file} | awk '{ if ($1 == "dim4") { print $2 } }' >> ${dicom_info}
+  # Add number of volumes to info file
+  fslinfo ${nifti_file} | awk '{ if ($1 == "dim4") { print $2 } }' >> ${dicom_info}
 
 fi

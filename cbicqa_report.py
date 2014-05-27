@@ -25,7 +25,7 @@
 #    You should have received a copy of the GNU General Public License
 #   along with CBICQA.  If not, see <http://www.gnu.org/licenses/>.
 #
-# Copyright 2013 California Institute of Technology.
+# Copyright 2013-2014 California Institute of Technology.
 
 import sys
 import os
@@ -126,27 +126,20 @@ td {
 # Main function
 def main():
     
-    # Report python version
-    # print(sys.version_info)
-    # print(sp.__version__)
-    
-    # Get QA data directory from shell environment
-    qa_data = os.environ['CBICQA_DATA']
-    
     # Get QA daily directory from command line args
     if len(sys.argv) > 1:
         qa_dir = sys.argv[1]
     else:
         qa_dir = os.getcwd()
     
-    print('Creating daily QA report for ' + qa_dir)
+    print('  Creating daily QA report for ' + qa_dir)
 
     #
     # QA Acquisition Info
     #
 
     # Load QA acquisition info
-    qa_info_file = os.path.join(qa_data, qa_dir, 'qa_info.txt')
+    qa_info_file = os.path.join(qa_dir, 'qa_info.txt')
     x = np.loadtxt(qa_info_file)
     
     # Parse QA info
@@ -167,14 +160,14 @@ def main():
     #
 
     # Construct stats parameter filename
-    qa_stats_parfile = os.path.join(qa_data, qa_dir, 'qa_stats.txt')
+    qa_stats_parfile = os.path.join(qa_dir, 'qa_stats.txt')
     
     if not os.path.isfile(qa_stats_parfile):
         print(qa_stats_parfile + ' does not exist - exiting')
-        sys.exit(0)
+        sys.exit(1)
         
     # Load stats parameters from qa_stats.pars file in the daily QA directory
-    print('Loading stats parameters from ' + qa_stats_parfile)
+    print('  Loading stats parameters from ' + qa_stats_parfile)
     x = np.loadtxt(qa_stats_parfile)
 
     # Parse parameters (in columns for each ROI)
@@ -220,7 +213,7 @@ def main():
     html_data = TEMPLATE.safe_substitute(qa_dict)
     
     # Write HTML report page
-    qa_report_file = os.path.join(qa_data, qa_dir, 'qa_report.html')
+    qa_report_file = os.path.join(qa_dir, 'index.html')
     open(qa_report_file, "w").write(html_data)
 
 # This is the standard boilerplate that calls the main() function.

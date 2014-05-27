@@ -25,16 +25,20 @@
 
 if [ $# -lt 2 ]; then
   echo "-----------------"
-  echo "SYNTAX : cbicqa.bash <QA Date> <Overwrite [Y|N]>"
+  echo "SYNTAX : cbicqa.bash <Scanner Name> <QA Date> <Search Keys> <Overwrite [Y|N]>"
   echo "<QA Date> has format: YYYYMMDD"
-  echo "This script is designed to be called by cbicqa_all.bash, but can be run manually"
+  echo "This script is designed to be called by cbicqa_scanner.bash, but can be run manually"
   exit
 fi
 
-# Construct QA analysis directory name
-qa_date=$1
-qa_overwrite=$2
-qa_dir=${CBICQA_DATA}/${qa_date}
+# Assign arguments
+scanner_name=$1
+qa_date=$2
+search_keys=$3
+overwrite=$4
+
+# Construct QA output directory
+qa_dir=${CBICQA_DATA}/${scanner_name}/${qa_date}
 
 # Full paths to commands (for XGrid if used)
 cmd_getdicom=${CBICQA_BIN}/cbicqa_getdicom.bash
@@ -45,7 +49,7 @@ cmd_stats=${CBICQA_BIN}/cbicqa_stats.py
 cmd_report=${CBICQA_BIN}/cbicqa_report.py
 
 # Check if directory already exists - if not, get data and analyze
-if [ ! -d ${qa_dir} -o ${qa_overwrite} == "Y" ]
+if [ ! -d ${qa_dir} -o ${overwrite} == "Y" ]
 then
 
   echo ""
@@ -59,9 +63,9 @@ then
     echo "  DICOM data has already been retrieved and converted - skipping"
   
   else
-  
+
     # Retrieve QA DICOM stack from local OsiriX
-    $cmd_getdicom $qa_dir $qa_date
+    $cmd_getdicom $qa_dir $qa_date "$search_keys"
 
     # Convert QA DICOM stack to 4D Nifti-1 volume
     $cmd_convert $qa_dir
@@ -81,13 +85,13 @@ then
   fi
   
   # Generate QA timeseries
-  $cmd_timeseries $qa_date
+  $cmd_timeseries $qa_dir
 
   # Calculate QA stats
-  $cmd_stats $qa_date
+  $cmd_stats $qa_dir
 
   # Generate HTML report and summary files
-  $cmd_report $qa_date
+  $cmd_report $qa_dir
   
   echo "  Complete"
   

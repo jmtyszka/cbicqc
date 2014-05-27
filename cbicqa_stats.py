@@ -5,10 +5,13 @@
 # - center of mass
 # - apparent motion
 #
+# USAGE : cbicqa_stats.py <QA Directory>
+#
 # AUTHOR : Mike Tyszka
 # PLACE  : Caltech
 # DATES  : 04/01/2013 JMT From scratch
 #          10/24/2013 JMT Expand to calculate all stats
+#          03/03/2014 JMT Add scanner name argument
 #
 # This file is part of CBICQA.
 #
@@ -25,7 +28,7 @@
 #    You should have received a copy of the GNU General Public License
 #   along with CBICQA.  If not, see <http://www.gnu.org/licenses/>.
 #
-# Copyright 2013 California Institute of Technology.
+# Copyright 2013-2014 California Institute of Technology.
 
 import sys
 import os
@@ -42,25 +45,23 @@ def main():
     # print(sys.version_info)
     # print(sp.__version__)
     
-    # Get QA data directory from shell environment
-    qa_data = os.environ['CBICQA_DATA']
-    
     # Get QA daily directory from command line args
     if len(sys.argv) >= 2:
         qa_dir = sys.argv[1]
     else:
         qa_dir = os.getcwd()
     
-    print('Detrending ' + qa_dir)
+    print('  Start python statistical analysis')
+    print('    Detrending ' + qa_dir)
 
     # Construct timeseries filename
-    qa_ts_file = os.path.join(qa_data,qa_dir,'qa_timeseries.txt')
+    qa_ts_file = os.path.join(qa_dir,'qa_timeseries.txt')
     if not os.path.isfile(qa_ts_file):
         print(qa_ts_file + ' does not exist - exiting')
         sys.exit(0)
 
     # Load timeseries from QA directory
-    print('Loading timeseries')
+    print('    Loading timeseries')
     x = np.loadtxt(qa_ts_file)
 
     # Parse timeseries into column vectors
@@ -82,7 +83,7 @@ def main():
     noise_mean   = noise_t.mean()
 
     # Fit exp + linear model to demeaned timeseries
-    print('Fitting exponential models')
+    print('    Fitting exponential models')
     phantom_opt, phantom_cov = curve_fit(explin, v, phantom_t - phantom_mean)
     nyquist_opt, nyquist_cov = curve_fit(explin, v, nyquist_t - nyquist_mean)
     noise_opt, noise_cov     = curve_fit(explin, v, noise_t - noise_mean)
@@ -146,8 +147,8 @@ def main():
     #
 
     # Calculate center of mass of temporal mean image using fslstats -c
-    print('Calculating center of mass of phantom')
-    com_cmd = ["fslstats",os.path.join(qa_data, qa_dir, "qa_mean"),"-c"]
+    print('    Calculating center of mass of phantom')
+    com_cmd = ["fslstats",os.path.join(qa_dir, "qa_mean"),"-c"]
     proc = subprocess.Popen(com_cmd, stdout=subprocess.PIPE)
     out,err = proc.communicate()
 
@@ -160,8 +161,8 @@ def main():
     #
     # Apparent motion parameters
     #
-    print('Analyzing motion parameters')
-    qa_mcf_parfile = os.path.join(qa_data, qa_dir, 'qa_mcf.par')
+    print('    Analyzing motion parameters')
+    qa_mcf_parfile = os.path.join(qa_dir, 'qa_mcf.par')
 
     if not os.path.isfile(qa_mcf_parfile):
       print(qa_mcf_parfile + ' does not exist - exiting')
@@ -195,12 +196,12 @@ def main():
     #
 
     # Save fit parameters
-    qa_stats_parfile = os.path.join(qa_data,qa_dir,'qa_stats.txt')
+    qa_stats_parfile = os.path.join(qa_dir,'qa_stats.txt')
     np.savetxt(qa_stats_parfile, stats_pars, delimiter=' ',fmt='%0.6f')
 
     # Save detrended timeseries
-    print('Writing detrended timeseries')
-    ts_detrend_file = os.path.join(qa_data,qa_dir,'qa_timeseries_detrend.txt')
+    print('    Writing detrended timeseries')
+    ts_detrend_file = os.path.join(qa_dir,'qa_timeseries_detrend.txt')
     np.savetxt(ts_detrend_file, ts_detrend, delimiter=' ',fmt='%0.6f')
 
     # Plot figures
@@ -226,7 +227,10 @@ def main():
     fig.subplots_adjust(hspace = 0.2)
 
     # Save figure in QA directory
-    savefig(os.path.join(qa_data,qa_dir,'qa_timeseries.png'), dpi = 72, bbox_inches = 'tight')
+    savefig(os.path.join(qa_dir,'qa_timeseries.png'), dpi = 72, bbox_inches = 'tight')
+
+    # Done
+    print('  Finished python statistical analysis')
 
 # Exponential + linear detrending model
 def explin(t, a, tau, b):
