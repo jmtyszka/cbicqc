@@ -218,6 +218,10 @@ else
   fslmeants -i ${qa_filt} -o ${qa_timeseries} --label=${qa_mask}
 fi
 
+# Create plot images for motion and ROI mean timeseries
+fsl_tsplot -i $qa_mcf_par -o ${qa_mcf}_rot.png -t Rotation_rad -a x,y,z --start=1 --finish=3
+fsl_tsplot -i $qa_mcf_par -o ${qa_mcf}_trans.png -t Translation_mm -a x,y,z --start=4 --finish=6
+
 # Calculate median tSNR within brain mask
 if [ -s ${qa_tsnr_median} ]; then
   echo "  tSNR median already calculated"

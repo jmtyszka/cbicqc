@@ -55,7 +55,7 @@ if [ -s ${dicom_info} ]; then
 	
 else
 	
-	echo "  Generating DICOM info file from ${dc_file}"
+	echo "  Extracting DICOM header information"
 
     # Scanner Serial Number
     mri_probedicom --i ${dc_file} --t 0018 1000 >> ${dicom_info}

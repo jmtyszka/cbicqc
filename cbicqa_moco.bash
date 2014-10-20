@@ -38,9 +38,9 @@ qa_mcf_par=${qa_dir}/qa_mcf.par
 if [ -s ${qa_mcf}.nii.gz ] && [ -s ${qa_mcf_par} ]; then
 	echo "  Motion correction has already been done - skipping"
 else
-	echo "  Motion correcting"
+	echo "  Motion correcting (this may take some time)"
 	# Run mcflirt on QA Nifti file
 	# Output file defaults to qa_mcf.nii.gz, parameters in qa_mcf.par
-	mcflirt -in ${qa_nifti} -out ${qa_mcf} -refvol 0 -plots
+	mcflirt -in ${qa_nifti} -out ${qa_mcf} -refvol 0 -plots &> /dev/null
 
 fi
