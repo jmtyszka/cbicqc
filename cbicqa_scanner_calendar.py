@@ -100,7 +100,7 @@ def main():
   # Note today's datetime
   dt_today = datetime.today()
 
-  # Loop over the past six months, including current month
+  # Loop over the past twelve months, including current month
   for dmonth in range(-5, 1, 1):
   
     # Create a new row at month -2

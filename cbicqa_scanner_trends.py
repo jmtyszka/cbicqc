@@ -57,7 +57,7 @@ td {
 
 <!-- Plotted timeseries -->
 <table>
-<tr><td> <h3>$scanner_name Trends for Past Six Months</h3></tr>
+<tr><td> <h3>$scanner_name QA Metric Trends</h3></tr>
 <tr><td valign="top"><img src=qa_trends.png /></tr>
 </table>
 
@@ -133,11 +133,12 @@ def main():
   nyquist_snr_all    = trend[:,19]
   
   #
-  # Trends for previous 6 months
+  # Trends over time
   #
   
   dt_today = datetime.today()
-  dt_6months_ago = dt_today + relativedelta( months = -6)
+  # dt_start = dt_today + relativedelta( months = -6)
+  dt_start = dt_today + relativedelta( months = -36 )
   
   # Plot trend graphs for most important metrics
   fig = figure(figsize = (16,16))
@@ -145,31 +146,31 @@ def main():
   subplot(511)
   plot(dt_all, phantom_snr_all, 'or')
   title("Phantom SNR", x = 0.5, y = 0.8)
-  xlim(dt_6months_ago, dt_today)
+  xlim(dt_start, dt_today)
   ylim(0, 50)
     
   subplot(512)
   plot(dt_all, nyquist_snr_all, 'or')
   title("Nyquist SNR", x = 0.5, y = 0.8)
-  xlim(dt_6months_ago, dt_today)
+  xlim(dt_start, dt_today)
   ylim(0, 3)
   
   subplot(513)
   plot(dt_all, nyquist_spikes_all, 'or')
   title("Nyquist Spikes", x = 0.5, y = 0.8)
-  xlim(dt_6months_ago, dt_today)
-  ylim(0, 10)
+  xlim(dt_start, dt_today)
+  ylim(0, 25)
   
   subplot(514)
   plot(dt_all, noise_spikes_all, 'or')
   title("Noise Spikes", x = 0.5, y = 0.8)
-  xlim(dt_6months_ago, dt_today)
-  ylim(0, 10)
+  xlim(dt_start, dt_today)
+  ylim(0, 25)
 
   subplot(515)
   plot(dt_all, phantom_drift_all, 'or')
   title("Phantom Drift (%)", x = 0.5, y = 0.8)
-  xlim(dt_6months_ago, dt_today)
+  xlim(dt_start, dt_today)
   ylim(-3, 1)
 
   # Pack all subplots and labels tightly

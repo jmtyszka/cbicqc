@@ -57,7 +57,7 @@ cbicqa_scanner.bash TIM_32 "-k 0008,1000=35077 -k 0010,0010=Qa -k 0010,0020=qa" 
 # cbicqa_scanner.bash TIM_12 "-k 0008,1000=35408 -k 0010,0010=Qa -k 0010,0020=qa" ${overwrite}
 
 # 4.7T Bruker
-#cbicqa_scanner.bash BRK_47 "-k 0008,0070=Bruker -k 0010,0010=QA" ${overwrite}
+# cbicqa_scanner.bash BRK_47 "-k 0008,0070=Bruker -k 0010,0010=QA" ${overwrite}
 
 # Create home page for QA reports linking each scanner's report
 # Final report HTML file is in $qa_data/qa_report.html
