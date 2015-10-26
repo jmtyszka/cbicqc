@@ -137,8 +137,7 @@ def main():
   #
   
   dt_today = datetime.today()
-  # dt_start = dt_today + relativedelta( months = -6)
-  dt_start = dt_today + relativedelta( months = -36 )
+  dt_start = dt_today + relativedelta( months = -12 )
   
   # Plot trend graphs for most important metrics
   fig = figure(figsize = (16,16))
