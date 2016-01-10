@@ -103,12 +103,13 @@ echo "Generating QA metrics"
 qa_timeseries=${qa_dir}/qa_timeseries.txt
 
 # Temporal mean of registered images
+# After motion correction, before demeaning
 if [ -s ${qa_tmean}.nii.gz ]
 then
   echo "  Mean image exists - skipping"
 else
   echo "  Calculating tMean image"
-  fslmaths ${qa_filt} -Tmean ${qa_tmean}
+  fslmaths ${qa_mcf} -Tmean ${qa_tmean}
 fi
 
 # Temporal SD of registered images
