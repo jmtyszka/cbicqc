@@ -153,7 +153,7 @@ def main():
     out,err = proc.communicate()
 
     # Split returned string and convert to floats
-    com_x, com_y, com_z = string.split(out)
+    com_x, com_y, com_z = out.split()
     com_x = float(com_x)
     com_y = float(com_y)
     com_z = float(com_z)
