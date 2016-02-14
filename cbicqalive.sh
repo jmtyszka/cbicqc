@@ -8,20 +8,19 @@
 # AUTHOR : Mike Tyszka, Ph.D.
 # PLACE  : Caltech
 # DATES  : 2014-02-12 JMT From scratch
+#          2016-02-12 JMT Add HTML and PDF report generation
 #
-# Copyright 2014 California Institute of Technology
+# Copyright 2014-2016 California Institute of Technology
 # All rights reserved.
 
 if [ $# -lt 2 ]; then
-  echo "USAGE : cbicqalive <4D EPI Nifti-1> <TR seconds>"
+  echo "USAGE : cbicqalive <4D EPI Nifti-1>
   exit
 fi
 
 # 4D EPI filename (including .nii.gz extension)
 epi_file=$1
 
-# TR required for high pass filtering
-TR_seconds=$2
 
 # Splash
 echo "------------------------------------------"
@@ -38,11 +37,12 @@ if [ ! -s ${epi_file} ]; then
   exit
 fi
 
-# Check that T1 file exists
-if [ ! -s ${T1_file} ]; then
-  echo "${T1_file} does not exist - exiting"
-  exit
-fi
+# Extract data dimensions from Nifti header
+
+
+
+# TR required for high pass filtering
+TR_seconds=$2
 
 # Find containing directory
 root_dir=`dirname $epi_file`
@@ -230,6 +230,9 @@ else
   echo "  Calculating median tSNR within brain mask"
   fslstats ${qa_tsnr} -k ${qa_brain_mask} -p 50 > ${qa_tsnr_median}
 fi
+
+# Generate HTML report page and convert to PDF
+cbicqalive_report.sh
 
 # Done
 echo "Finished at : `date`"
