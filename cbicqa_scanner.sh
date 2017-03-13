@@ -2,7 +2,7 @@
 #
 # Master QA analysis script
 #
-# USAGE: cbicqa_scanner.bash <Scanner Name> <Search Keys> <Overwrite [Y|N]>
+# USAGE: cbicqa_scanner.sh <Scanner Name> <Search Keys> <Overwrite [Y|N]>
 #
 # Query and retrieve new QA studies for a given scanner from the local OsiriX database
 # Use dcmtk command line functions to generate list of new QA data and 
@@ -39,7 +39,7 @@ if [ -z "${CBICQA_DATA}" ]; then
 fi
 
 if [ $# -lt 3 ]; then
-  echo "USAGE : cbicqa_scanner.bash <Scanner Name> <Search Keys> <Overwrite [Y|N]>"
+  echo "USAGE : cbicqa_scanner.sh <Scanner Name> <Search Keys> <Overwrite [Y|N]>"
   exit
 fi
 
@@ -80,7 +80,7 @@ do
     qa_date=${qa_date/:/}
 
     # Call single study QA analysis
-    cbicqa.bash ${scanner_name} ${qa_date} "${search_keys}" ${overwrite}
+    cbicqa.sh ${scanner_name} ${qa_date} "${search_keys}" ${overwrite}
    
 done
 

@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Workspace
+   version = "1.0">
+   <FileRef
+      location = "group:cbicqa_all.sh">
+   </FileRef>
+   <FileRef
+      location = "group:cbicqa_checklims.sh">
+   </FileRef>
+   <FileRef
+      location = "group:cbicqa_dicom2nifti.sh">
+   </FileRef>
+   <FileRef
+      location = "group:cbicqa_getdicom.sh">
+   </FileRef>
+   <FileRef
+      location = "group:cbicqa_meansd.sh">
+   </FileRef>
+   <FileRef
+      location = "group:cbicqa_moco.sh">
+   </FileRef>
+   <FileRef
+      location = "group:cbicqa_report_all.py">
+   </FileRef>
+   <FileRef
+      location = "group:cbicqa_report.py">
+   </FileRef>
+   <FileRef
+      location = "group:cbicqa_scanner_calendar.py">
+   </FileRef>
+   <FileRef
+      location = "group:cbicqa_scanner_trends.py">
+   </FileRef>
+   <FileRef
+      location = "group:cbicqa_scanner.sh">
+   </FileRef>
+   <FileRef
+      location = "group:cbicqa_stats.py">
+   </FileRef>
+   <FileRef
+      location = "group:cbicqa_timeseries.sh">
+   </FileRef>
+   <FileRef
+      location = "group:cbicqa.sh">
+   </FileRef>
+   <FileRef
+      location = "group:CBICQA.xcworkspace">
+   </FileRef>
+   <FileRef
+      location = "group:COPYING.txt">
+   </FileRef>
+</Workspace>

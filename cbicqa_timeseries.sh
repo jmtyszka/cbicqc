@@ -35,7 +35,7 @@ phantom_volume_ml=2500
 # Check arguments
 if [ $# -lt 1 ]; then
   echo "Please provide a QA date to process (in form YYYYMMDD)"
-  echo "SYNTAX : cbicqa_timeseries.bash <QA Date>"
+  echo "SYNTAX : cbicqa_timeseries.sh <QA Date>"
   exit
 fi
 

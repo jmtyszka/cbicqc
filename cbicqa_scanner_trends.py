@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # Generate graphical trends report page for a given scanner
 #
@@ -59,7 +59,7 @@ td, th {
 <table>
 <tr><td> <h2>$scanner_name QA Metric Trends</h2></tr>
 <tr><td> <h4>Report generated on $report_date</h4></tr>
-<tr><td> <center> Metric  Median  [ 5th Percentile to 95th Percentile ] </center> </tr> 
+<tr><td> <center> Metric  Median  [ 5th Percentile to 95th Percentile ] </center> </tr>
 <tr><td valign="top"><img src=qa_trends.png /></tr>
 </table>
 
@@ -109,7 +109,7 @@ def main():
             MM   = int(direl[4:6])
             DD   = int(direl[6:8])
             this_dt    = datetime(YYYY,MM,DD)
-    
+
             # Append new column to trend and date arrays
             if ndays < 1:
                 dt_all = this_dt
@@ -118,11 +118,11 @@ def main():
             else:
                 dt_all = np.append(dt_all, this_dt)
                 trend = np.append(trend, x)
-    
-            ndays = ndays + 1               
+
+            ndays = ndays + 1
 
     trend = trend.reshape(ndays,npars)
-    
+
     # Create time mask for past 12 months
     dt1 = datetime.today()
     dt0 = dt1 + relativedelta( months = -12 )
@@ -142,7 +142,7 @@ def main():
     pDrift_5, pDrift_50, pDrift_95 = np.percentile(pDrift, (5,50,95))
     nySpike_5, nySpike_50, nySpike_95 = np.percentile(nySpike, (5,50,95))
     nSpike_5, nSpike_50, nSpike_95 = np.percentile(nSpike, (5,50,95))
-    
+
     # Plot metric graphs for past 12 months
     fig = figure(figsize = (16,16))
 

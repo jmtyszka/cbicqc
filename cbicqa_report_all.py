@@ -1,4 +1,4 @@
-#!/opt/local/bin/python
+#!/usr/bin/env python
 #
 # Generate top level HTML report page for all scanners
 #

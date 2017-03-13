@@ -24,7 +24,7 @@
 
 if [ $# -lt 1 ]; then
   echo "Please provide a QA directory name"
-  echo "SYNTAX : cbicqa_moco.bash <QA Directory>"
+  echo "SYNTAX : cbicqa_moco.sh <QA Directory>"
   exit
 fi
 

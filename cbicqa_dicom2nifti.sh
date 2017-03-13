@@ -86,10 +86,10 @@ else
 	mri_convert ${dc_file} ${nifti_file} &> ${qa_dir}/qa_mri_convert.log
 
 	# Delete the DICOM subdirectory if conversion successful (ie qa.nii.gz file exists)
-	# if [ -s ${nifti_file} ]; then
-	# echo "  Removing temporary DICOM files"
-	#	  rm -rf ${qa_dir}/DICOM
-	# fi
+	if [ -s ${nifti_file} ]; then
+	echo "  Removing temporary DICOM files"
+	  rm -rf ${qa_dir}/DICOM
+	fi
 
   # Add number of volumes to info file
   fslinfo ${nifti_file} | awk '{ if ($1 == "dim4") { print $2 } }' >> ${dicom_info}

@@ -1,4 +1,5 @@
-#!/opt/local/bin/python
+#!/usr/bin/env python
+#
 # Derive various descriptive stats from the preprocessed QA data
 # - detrended time series parameters
 # - spike counts

@@ -1,4 +1,4 @@
-#!/opt/local/bin/python
+#!/usr/bin/env python
 #
 # Generate an HTML calendar linking QA studies for a given scanner
 #

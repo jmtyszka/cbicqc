@@ -25,9 +25,9 @@
 
 if [ $# -lt 2 ]; then
   echo "-----------------"
-  echo "SYNTAX : cbicqa.bash <Scanner Name> <QA Date> <Search Keys> <Overwrite [Y|N]>"
+  echo "SYNTAX : cbicqa.sh <Scanner Name> <QA Date> <Search Keys> <Overwrite [Y|N]>"
   echo "<QA Date> has format: YYYYMMDD"
-  echo "This script is designed to be called by cbicqa_scanner.bash, but can be run manually"
+  echo "This script is designed to be called by cbicqa_scanner.sh, but can be run manually"
   exit
 fi
 
@@ -41,10 +41,10 @@ overwrite=$4
 qa_dir=${CBICQA_DATA}/${scanner_name}/${qa_date}
 
 # Full paths to commands (for XGrid if used)
-cmd_getdicom=${CBICQA_BIN}/cbicqa_getdicom.bash
-cmd_convert=${CBICQA_BIN}/cbicqa_dicom2nifti.bash
-cmd_moco=${CBICQA_BIN}/cbicqa_moco.bash
-cmd_timeseries=${CBICQA_BIN}/cbicqa_timeseries.bash
+cmd_getdicom=${CBICQA_BIN}/cbicqa_getdicom.sh
+cmd_convert=${CBICQA_BIN}/cbicqa_dicom2nifti.sh
+cmd_moco=${CBICQA_BIN}/cbicqa_moco.sh
+cmd_timeseries=${CBICQA_BIN}/cbicqa_timeseries.sh
 cmd_stats=${CBICQA_BIN}/cbicqa_stats.py
 cmd_report=${CBICQA_BIN}/cbicqa_report.py
 

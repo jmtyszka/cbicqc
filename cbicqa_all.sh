@@ -2,7 +2,7 @@
 #
 # Master QA analysis script
 #
-# USAGE: cbicqa_all.bash <Overwrite [Y|N]>
+# USAGE: cbicqa_all.sh <Overwrite [Y|N]>
 #
 # Query and retrieve new QA studies for all scanners from the local OsiriX database
 # Use dcmtk command line functions to generate list of new QA data and 
@@ -48,16 +48,16 @@ echo "CBIC QA Analysis"
 echo "----------------"
 echo "QA Data Directory : ${CBICQA_DATA}"
 
-# Call cbicqa_scanner.bash for each scanner
+# Call cbicqa_scanner.sh for each scanner
 
 # Siemens TIM32
-cbicqa_scanner.bash TIM_32 "-k 0008,1000=35077 -k 0010,0010=Qa -k 0010,0020=qa" ${overwrite}
+cbicqa_scanner.sh TIM_32 "-k 0008,1000=35077 -k 0010,0010=Qa -k 0010,0020=qa" ${overwrite}
 
 # Siemens TIM12
-# cbicqa_scanner.bash TIM_12 "-k 0008,1000=35408 -k 0010,0010=Qa -k 0010,0020=qa" ${overwrite}
+# cbicqa_scanner.sh TIM_12 "-k 0008,1000=35408 -k 0010,0010=Qa -k 0010,0020=qa" ${overwrite}
 
 # 4.7T Bruker
-# cbicqa_scanner.bash BRK_47 "-k 0008,0070=Bruker -k 0010,0010=QA" ${overwrite}
+# cbicqa_scanner.sh BRK_47 "-k 0008,0070=Bruker -k 0010,0010=QA" ${overwrite}
 
 # Create home page for QA reports linking each scanner's report
 # Final report HTML file is in $qa_data/qa_report.html
