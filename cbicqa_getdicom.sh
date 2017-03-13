@@ -1,9 +1,12 @@
 #!/bin/bash
 # Retrieve daily QA DICOM stack from server into local directory
 #
+# USAGE: cbicqa_getdicom.sh <CBICQA directory> <study date YYYYMMDD> <search keys> [-d]
+#
 # AUTHOR : Mike Tyszka, Ph.D.
 # PLACE  : Caltech Brain Imaging Center
 # DATES  : 10/10/2011 JMT From scratch
+#          2017-03-13 JMT Update for Horos SCP
 #
 # This file is part of CBICQA.
 #
@@ -20,10 +23,10 @@
 #    You should have received a copy of the GNU General Public License
 #   along with CBICQA.  If not, see <http://www.gnu.org/licenses/>.
 #
-# Copyright 2011-2013 California Institute of Technology.
+# Copyright 2011-2017 California Institute of Technology.
 
 # Local OsiriX AE Title
-osirix_aet=EVENDIM
+osirix_aet=evendim
 
 # Local Osirix host name
 #osirix_hostname=evendim.caltech.edu
