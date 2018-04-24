@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 #
-# Derive various descriptive stats from the preprocessed QA data
+# Derive various descriptive stats from the preprocessed QC data
 # - detrended time series parameters
 # - spike counts
 # - center of mass
 # - apparent motion
 #
-# USAGE : cbicqa_stats.py <QA Directory>
+# USAGE : cbicqc_stats.py <QC Directory>
 #
 # AUTHOR : Mike Tyszka
 # PLACE  : Caltech
@@ -14,20 +14,20 @@
 #          10/24/2013 JMT Expand to calculate all stats
 #          03/03/2014 JMT Add scanner name argument
 #
-# This file is part of CBICQA.
+# This file is part of CBICQC.
 #
-#    CBICQA is free software: you can redistribute it and/or modify
+#    CBICQC is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
 #    the Free Software Foundation, either version 3 of the License, or
 #    (at your option) any later version.
 #
-#    CBICQA is distributed in the hope that it will be useful,
+#    CBICQC is distributed in the hope that it will be useful,
 #    but WITHOUT ANY WARRANTY; without even the implied warranty of
 #    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #    GNU General Public License for more details.
 #
 #    You should have received a copy of the GNU General Public License
-#   along with CBICQA.  If not, see <http://www.gnu.org/licenses/>.
+#   along with CBICQC.  If not, see <http://www.gnu.org/licenses/>.
 #
 # Copyright 2013-2014 California Institute of Technology.
 
@@ -46,24 +46,24 @@ def main():
     # print(sys.version_info)
     # print(sp.__version__)
     
-    # Get QA daily directory from command line args
+    # Get QC daily directory from command line args
     if len(sys.argv) >= 2:
-        qa_dir = sys.argv[1]
+        qc_dir = sys.argv[1]
     else:
-        qa_dir = os.getcwd()
+        qc_dir = os.getcwd()
     
     print('  Start python statistical analysis')
-    print('    Detrending ' + qa_dir)
+    print('    Detrending ' + qc_dir)
 
     # Construct timeseries filename
-    qa_ts_file = os.path.join(qa_dir,'qa_timeseries.txt')
-    if not os.path.isfile(qa_ts_file):
-        print(qa_ts_file + ' does not exist - exiting')
+    qc_ts_file = os.path.join(qc_dir,'qc_timeseries.txt')
+    if not os.path.isfile(qc_ts_file):
+        print(qc_ts_file + ' does not exist - exiting')
         sys.exit(0)
 
-    # Load timeseries from QA directory
+    # Load timeseries from QC directory
     print('    Loading timeseries')
-    x = np.loadtxt(qa_ts_file)
+    x = np.loadtxt(qc_ts_file)
 
     # Parse timeseries into column vectors
     phantom_t = x[:,0]
@@ -149,7 +149,7 @@ def main():
 
     # Calculate center of mass of temporal mean image using fslstats -c
     print('    Calculating center of mass of phantom')
-    com_cmd = ["fslstats",os.path.join(qa_dir, "qa_mean"),"-c"]
+    com_cmd = ["fslstats",os.path.join(qc_dir, "qc_mean"),"-c"]
     proc = subprocess.Popen(com_cmd, stdout=subprocess.PIPE)
     out,err = proc.communicate()
 
@@ -163,14 +163,14 @@ def main():
     # Apparent motion parameters
     #
     print('    Analyzing motion parameters')
-    qa_mcf_parfile = os.path.join(qa_dir, 'qa_mcf.par')
+    qc_mcf_parfile = os.path.join(qc_dir, 'qc_mcf.par')
 
-    if not os.path.isfile(qa_mcf_parfile):
-      print(qa_mcf_parfile + ' does not exist - exiting')
+    if not os.path.isfile(qc_mcf_parfile):
+      print(qc_mcf_parfile + ' does not exist - exiting')
       sys.exit(0)
 
     # N x 6 array (6 motion parameters in columns)
-    x = np.loadtxt(qa_mcf_parfile)
+    x = np.loadtxt(qc_mcf_parfile)
 
     # Extract displacement timeseries for each axis
     dx = x[:,3]
@@ -197,12 +197,12 @@ def main():
     #
 
     # Save fit parameters
-    qa_stats_parfile = os.path.join(qa_dir,'qa_stats.txt')
-    np.savetxt(qa_stats_parfile, stats_pars, delimiter=' ',fmt='%0.6f')
+    qc_stats_parfile = os.path.join(qc_dir,'qc_stats.txt')
+    np.savetxt(qc_stats_parfile, stats_pars, delimiter=' ',fmt='%0.6f')
 
     # Save detrended timeseries
     print('    Writing detrended timeseries')
-    ts_detrend_file = os.path.join(qa_dir,'qa_timeseries_detrend.txt')
+    ts_detrend_file = os.path.join(qc_dir,'qc_timeseries_detrend.txt')
     np.savetxt(ts_detrend_file, ts_detrend, delimiter=' ',fmt='%0.6f')
 
     # Plot figures
@@ -227,8 +227,8 @@ def main():
     # Pack all subplots and labels tightly
     fig.subplots_adjust(hspace = 0.2)
 
-    # Save figure in QA directory
-    savefig(os.path.join(qa_dir,'qa_timeseries.png'), dpi = 72, bbox_inches = 'tight')
+    # Save figure in QC directory
+    savefig(os.path.join(qc_dir,'qc_timeseries.png'), dpi = 72, bbox_inches = 'tight')
 
     # Done
     print('  Finished python statistical analysis')

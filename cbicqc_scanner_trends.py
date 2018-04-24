@@ -6,20 +6,20 @@
 # DATES  : 09/16/2011 JMT From scratch
 #          03/12/2014 JMT Switch to trend report page format
 #
-# This file is part of CBICQA.
+# This file is part of CBICQC.
 #
-#    CBICQA is free software: you can redistribute it and/or modify
+#    CBICQC is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
 #    the Free Software Foundation, either version 3 of the License, or
 #    (at your option) any later version.
 #
-#    CBICQA is distributed in the hope that it will be useful,
+#    CBICQC is distributed in the hope that it will be useful,
 #    but WITHOUT ANY WARRANTY; without even the implied warranty of
 #    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #    GNU General Public License for more details.
 #
 #    You should have received a copy of the GNU General Public License
-#   along with CBICQA.  If not, see <http://www.gnu.org/licenses/>.
+#   along with CBICQC.  If not, see <http://www.gnu.org/licenses/>.
 #
 # Copyright 2011-2014 California Institute of Technology.
 
@@ -53,14 +53,14 @@ td, th {
 
 <body>
 
-<h1 style="background-color:#E0E0FF">CBIC QA Trend Report</h1>
+<h1 style="background-color:#E0E0FF">CBIC QC Trend Report</h1>
 
 <!-- Plotted timeseries -->
 <table>
-<tr><td> <h2>$scanner_name QA Metric Trends</h2></tr>
+<tr><td> <h2>$scanner_name QC Metric Trends</h2></tr>
 <tr><td> <h4>Report generated on $report_date</h4></tr>
 <tr><td> <center> Metric  Median  [ 5th Percentile to 95th Percentile ] </center> </tr>
-<tr><td valign="top"><img src=qa_trends.png /></tr>
+<tr><td valign="top"><img src=qc_trends.png /></tr>
 </table>
 
 """
@@ -72,37 +72,37 @@ def main():
     if len(sys.argv) > 1:
         scanner_name = sys.argv[1]
     else:
-        print('USAGE : cbicqa_scanner_trends.py <scanner name>')
+        print('USAGE : cbicqc_scanner_trends.py <scanner name>')
         sys.exit(1)
 
-    # Get QA data directory from shell environment
-    cbicqa_data_dir = os.environ['CBICQA_DATA']
+    # Get QC data directory from shell environment
+    cbicqc_data_dir = os.environ['CBICQC_DATA']
 
-    # Full scanner QA directory path
-    scanner_qa_dir = os.path.join(cbicqa_data_dir, scanner_name)
+    # Full scanner QC directory path
+    scanner_qc_dir = os.path.join(cbicqc_data_dir, scanner_name)
 
-    # Check that scanner QA directory exists
-    if not os.path.isdir(scanner_qa_dir):
-        print('QA directory does not exist - skipping')
+    # Check that scanner QC directory exists
+    if not os.path.isdir(scanner_qc_dir):
+        print('QC directory does not exist - skipping')
         sys.exit(1)
 
     # Day counter
     ndays = 0
 
-    print('Collecting QA metrics')
+    print('Collecting QC metrics')
 
-    # Loop over all daily QA directories
-    for direl in os.listdir(scanner_qa_dir):
+    # Loop over all daily QC directories
+    for direl in os.listdir(scanner_qc_dir):
 
-        # Full path to daily QA directory
-        qa_daily_dir = os.path.join(scanner_qa_dir, direl)
+        # Full path to daily QC directory
+        qc_daily_dir = os.path.join(scanner_qc_dir, direl)
 
-        # Daily QA directory
-        if os.path.isdir(qa_daily_dir):
+        # Daily QC directory
+        if os.path.isdir(qc_daily_dir):
 
-            # Load daily QA metrics
-            qa_info_file = os.path.join(qa_daily_dir, 'qa_stats.txt')
-            x = np.loadtxt(qa_info_file)
+            # Load daily QC metrics
+            qc_info_file = os.path.join(qc_daily_dir, 'qc_stats.txt')
+            x = np.loadtxt(qc_info_file)
 
             # Parse directory name into ISO format date
             YYYY = int(direl[0:4])
@@ -189,27 +189,27 @@ def main():
     # Pack all subplots and labels tightly
     fig.subplots_adjust(hspace = 0.2)
 
-    # Save figure in QA data directory
-    savefig(os.path.join(scanner_qa_dir, 'qa_trends.png'), dpi = 72, bbox_inches = 'tight')
+    # Save figure in QC data directory
+    savefig(os.path.join(scanner_qc_dir, 'qc_trends.png'), dpi = 72, bbox_inches = 'tight')
 
     #
     # HTML report generation
     #
 
     # Create substitution dictionary for HTML report
-    qa_dict = dict([
+    qc_dict = dict([
         ('report_date',  datetime.today().ctime()),
         ('scanner_name', scanner_name),
     ])
 
     # Generate HTML report from template (see above)
     TEMPLATE = string.Template(TEMPLATE_FORMAT)
-    html_data = TEMPLATE.safe_substitute(qa_dict)
+    html_data = TEMPLATE.safe_substitute(qc_dict)
 
     # Write HTML report page
-    qa_trend_report = os.path.join(scanner_qa_dir, 'trends.html')
+    qc_trend_report = os.path.join(scanner_qc_dir, 'trends.html')
     print('Writing trends report')
-    open(qa_trend_report, "w").write(html_data)
+    open(qc_trend_report, "w").write(html_data)
 
 
 # This is the standard boilerplate that calls the main() function.

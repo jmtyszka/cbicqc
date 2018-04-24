@@ -1,24 +1,24 @@
 #!/usr/bin/env python
 #
-# Generate an HTML calendar linking QA studies for a given scanner
+# Generate an HTML calendar linking QC studies for a given scanner
 #
 # AUTHOR : Mike Tyszka, Ph.D.
-# DATES  : 03/13/2014 JMT Adapt from cbicqa_scanner_trends.py
+# DATES  : 03/13/2014 JMT Adapt from cbicqc_scanner_trends.py
 #
-# This file is part of CBICQA.
+# This file is part of CBICQC.
 #
-#    CBICQA is free software: you can redistribute it and/or modify
+#    CBICQC is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
 #    the Free Software Foundation, either version 3 of the License, or
 #    (at your option) any later version.
 #
-#    CBICQA is distributed in the hope that it will be useful,
+#    CBICQC is distributed in the hope that it will be useful,
 #    but WITHOUT ANY WARRANTY; without even the implied warranty of
 #    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #    GNU General Public License for more details.
 #
 #    You should have received a copy of the GNU General Public License
-#   along with CBICQA.  If not, see <http://www.gnu.org/licenses/>.
+#   along with CBICQC.  If not, see <http://www.gnu.org/licenses/>.
 #
 # Copyright 2014 California Institute of Technology.
 
@@ -61,20 +61,20 @@ def main():
   if len(sys.argv) > 1:
     scanner_name = sys.argv[1]
   else:
-    print('USAGE : cbicqa_scanner_calendar.py <scanner name>')
+    print('USAGE : cbicqc_scanner_calendar.py <scanner name>')
     sys.exit(1)
 
-  # Get QA data directory from shell environment
-  cbicqa_data_dir = os.environ['CBICQA_DATA']
+  # Get QC data directory from shell environment
+  cbicqc_data_dir = os.environ['CBICQC_DATA']
 
-  # Full scanner QA directory path
-  scanner_qa_dir = os.path.join(cbicqa_data_dir, scanner_name)
+  # Full scanner QC directory path
+  scanner_qc_dir = os.path.join(cbicqc_data_dir, scanner_name)
 
   # Output calendar web page name
-  # NOTE : this is the index page for the scanner QA directory
-  qa_scanner_calendar = os.path.join(scanner_qa_dir, 'index.html')
+  # NOTE : this is the index page for the scanner QC directory
+  qc_scanner_calendar = os.path.join(scanner_qc_dir, 'index.html')
 
-  print('Writing scanner calendar to ' + qa_scanner_calendar)
+  print('Writing scanner calendar to ' + qc_scanner_calendar)
 
   # Set first day of week to SUNDAY (US)
   calendar.setfirstweekday(calendar.SUNDAY)
@@ -84,13 +84,13 @@ def main():
   #
 
   # Open HTML calendar page for this scanner
-  fd = open(qa_scanner_calendar, "w")
+  fd = open(qc_scanner_calendar, "w")
 
   # Write HTML header boilerplate
   fd.write(HTML_HEADER)
 
   # Write header splash for this scanner
-  fd.write('<h1 style="background-color:#E0E0FF">CBIC QA Calendar for %s</h1>' %(scanner_name))
+  fd.write('<h1 style="background-color:#E0E0FF">CBIC QC Calendar for %s</h1>' %(scanner_name))
 
   # Create a table to hold month calendars
   # Two rows of three months, from oldest to most recent
@@ -137,20 +137,20 @@ def main():
         
         if this_d > 0:
         
-          # Create QA date string (YYYYMMDD)
-          qa_date_str = '%s%02d%02d' %(dt_past.year, dt_past.month, this_d)
+          # Create QC date string (YYYYMMDD)
+          qc_date_str = '%s%02d%02d' %(dt_past.year, dt_past.month, this_d)
           
-          # Create path to local daily QA index page
-          qa_dir = os.path.join(scanner_qa_dir, qa_date_str)
-          qa_index = os.path.join(qa_dir, 'index.html')
+          # Create path to local daily QC index page
+          qc_dir = os.path.join(scanner_qc_dir, qc_date_str)
+          qc_index = os.path.join(qc_dir, 'index.html')
           
-          # Check if daily QA index exists for this date
-          if os.path.isfile(qa_index):
+          # Check if daily QC index exists for this date
+          if os.path.isfile(qc_index):
           
-            # Create relative URL to this daily QA
+            # Create relative URL to this daily QC
             # No need to prefix with scanner name
-            qa_url = os.path.join(qa_date_str, 'index.html')
-            fd.write('<td><a href="%s">%d</a>' %(qa_url, this_d))
+            qc_url = os.path.join(qc_date_str, 'index.html')
+            fd.write('<td><a href="%s">%d</a>' %(qc_url, this_d))
       
           else:
             

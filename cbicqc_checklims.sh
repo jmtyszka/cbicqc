@@ -5,20 +5,20 @@
 # AUTHOR : Mike Tyszka, Ph.D.
 # DATES  : 10/16/2012 JMT From scratch
 #
-# This file is part of CBICQA.
+# This file is part of CBICQC.
 #
-#    CBICQA is free software: you can redistribute it and/or modify
+#    CBICQC is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
 #    the Free Software Foundation, either version 3 of the License, or
 #    (at your option) any later version.
 #
-#    CBICQA is distributed in the hope that it will be useful,
+#    CBICQC is distributed in the hope that it will be useful,
 #    but WITHOUT ANY WARRANTY; without even the implied warranty of
 #    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #    GNU General Public License for more details.
 #
 #    You should have received a copy of the GNU General Public License
-#   along with CBICQA.  If not, see <http://www.gnu.org/licenses/>.
+#   along with CBICQC.  If not, see <http://www.gnu.org/licenses/>.
 #
 # Copyright 2012-2013 California Institute of Technology.
 

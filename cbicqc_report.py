@@ -1,29 +1,29 @@
 #!/usr/bin/env python
 #
-# Create daily QA HTML report
+# Create daily QC HTML report
 #
-# USAGE : cbicqa_report.py <QA Directory>
+# USAGE : cbicqc_report.py <QC Directory>
 #
 # AUTHOR : Mike Tyszka
 # PLACE  : Caltech
 # DATES  : 09/25/2013 JMT From scratch
 #          10/23/2013 JMT Add com external call
-#          10/24/2013 JMT Move stats calcs to new cbicqa_stats.py
+#          10/24/2013 JMT Move stats calcs to new cbicqc_stats.py
 #
-# This file is part of CBICQA.
+# This file is part of CBICQC.
 #
-#    CBICQA is free software: you can redistribute it and/or modify
+#    CBICQC is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
 #    the Free Software Foundation, either version 3 of the License, or
 #    (at your option) any later version.
 #
-#    CBICQA is distributed in the hope that it will be useful,
+#    CBICQC is distributed in the hope that it will be useful,
 #    but WITHOUT ANY WARRANTY; without even the implied warranty of
 #    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #    GNU General Public License for more details.
 #
 #    You should have received a copy of the GNU General Public License
-#   along with CBICQA.  If not, see <http://www.gnu.org/licenses/>.
+#   along with CBICQC.  If not, see <http://www.gnu.org/licenses/>.
 #
 # Copyright 2013-2014 California Institute of Technology.
 
@@ -54,7 +54,7 @@ td {
 
 <body>
 
-<h1 style="background-color:#E0E0FF">CBIC Daily QA Report</h1>
+<h1 style="background-color:#E0E0FF">CBIC Daily QC Report</h1>
 
 <table>
 <tr>
@@ -112,11 +112,11 @@ td {
 </tr>
 
 <tr>
-<td valign="top"><img src=qa_timeseries.png />
+<td valign="top"><img src=qc_timeseries.png />
 <td valign="top">
-<b>tMean</b><br> <img src=qa_mean_ortho.png /><br><br>
-<b>tSD</b><br> <img src=qa_sd_ortho.png /><br><br>
-<b>Region Mask</b><br> <img src=qa_mask_ortho.png /><br><br>
+<b>tMean</b><br> <img src=qc_mean_ortho.png /><br><br>
+<b>tSD</b><br> <img src=qc_sd_ortho.png /><br><br>
+<b>Region Mask</b><br> <img src=qc_mask_ortho.png /><br><br>
 </tr>
 
 </table>
@@ -126,23 +126,23 @@ td {
 # Main function
 def main():
     
-    # Get QA daily directory from command line args
+    # Get QC daily directory from command line args
     if len(sys.argv) > 1:
-        qa_dir = sys.argv[1]
+        qc_dir = sys.argv[1]
     else:
-        qa_dir = os.getcwd()
+        qc_dir = os.getcwd()
     
-    print('  Creating daily QA report for ' + qa_dir)
+    print('  Creating daily QC report for ' + qc_dir)
 
     #
-    # QA Acquisition Info
+    # QC Acquisition Info
     #
 
-    # Load QA acquisition info
-    qa_info_file = os.path.join(qa_dir, 'qa_info.txt')
-    x = np.loadtxt(qa_info_file)
+    # Load QC acquisition info
+    qc_info_file = os.path.join(qc_dir, 'qc_info.txt')
+    x = np.loadtxt(qc_info_file)
     
-    # Parse QA info
+    # Parse QC info
     scanner_serno = x[0]
     acq_date      = "%d" % (x[1])
     scanner_freq  = x[2]
@@ -156,19 +156,19 @@ def main():
     acq_date = YYYY + '-' + MM + '-' + DD
  
     #
-    # QA statistics
+    # QC statistics
     #
 
     # Construct stats parameter filename
-    qa_stats_parfile = os.path.join(qa_dir, 'qa_stats.txt')
+    qc_stats_parfile = os.path.join(qc_dir, 'qc_stats.txt')
     
-    if not os.path.isfile(qa_stats_parfile):
-        print(qa_stats_parfile + ' does not exist - exiting')
+    if not os.path.isfile(qc_stats_parfile):
+        print(qc_stats_parfile + ' does not exist - exiting')
         sys.exit(1)
         
-    # Load stats parameters from qa_stats.pars file in the daily QA directory
-    print('  Loading stats parameters from ' + qa_stats_parfile)
-    x = np.loadtxt(qa_stats_parfile)
+    # Load stats parameters from qc_stats.pars file in the daily QC directory
+    print('  Loading stats parameters from ' + qc_stats_parfile)
+    x = np.loadtxt(qc_stats_parfile)
 
     # Parse parameters (in columns for each ROI)
     phantom_a, phantom_tau, phantom_b, phantom_mean, phantom_spikes, phantom_drift = x[0:6]
@@ -183,7 +183,7 @@ def main():
     #
 
     # Create substitution dictionary for HTML report
-    qa_dict = dict([
+    qc_dict = dict([
       ('scanner_serno',  "%d"    % (scanner_serno)),
       ('acq_date',       "%s"    % (acq_date)),
       ('scanner_freq',   "%0.4f" % (scanner_freq)),
@@ -210,11 +210,11 @@ def main():
 
     # Generate HTML report from template (see above)
     TEMPLATE = string.Template(TEMPLATE_FORMAT)
-    html_data = TEMPLATE.safe_substitute(qa_dict)
+    html_data = TEMPLATE.safe_substitute(qc_dict)
     
     # Write HTML report page
-    qa_report_file = os.path.join(qa_dir, 'index.html')
-    open(qa_report_file, "w").write(html_data)
+    qc_report_file = os.path.join(qc_dir, 'index.html')
+    open(qc_report_file, "w").write(html_data)
 
 # This is the standard boilerplate that calls the main() function.
 if __name__ == '__main__':
