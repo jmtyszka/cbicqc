@@ -145,6 +145,7 @@ setup(
     # https://packaging.python.org/en/latest/requirements.html
     install_requires=['pydicom>=1.2.2',
                       'numpy>=1.15.2',
+                      'pybids',
                       'pynetdicom>=1.2.0'],  # Optional
 
     # List additional groups of dependencies here (e.g. development
@@ -183,11 +184,11 @@ setup(
     #
     # For example, the following would provide a command called `sample` which
     # executes the function `main` from this package when invoked:
-    entry_points={  # Optional
-        'console_scripts': [
-            'cbicqc=cbicqc.launcher:main',
-        ],
-    },
+    # entry_points={  # Optional
+    #     'console_scripts': [
+    #         'cbicqc=cbicqc.launcher:main',
+    #     ],
+    # },
 
     # List additional URLs that are relevant to your project as a dict.
     #

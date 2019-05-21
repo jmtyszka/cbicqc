@@ -1,0 +1,99 @@
+#!/usr/bin/env python3
+"""
+Fix subject and session directory naming in sourcedata for CBIC QC series exported from Horos
+
+AUTHOR
+----
+Mike Tyszka, Ph.D.
+"""
+
+import os
+import sys
+from glob import glob
+import argparse
+from pathlib import Path
+import pydicom
+from shutil import rmtree
+
+
+def main():
+
+    parser = argparse.ArgumentParser(description='Fix subject and session directory naming in Horos output')
+
+    parser.add_argument('-d', '--dataset', default='.',
+                        help='BIDS dataset directory containing sourcedata subdirectory')
+
+    # Parse command line arguments
+    args = parser.parse_args()
+    dataset_dir = os.path.realpath(args.dataset)
+
+    src_dir = os.path.join(dataset_dir, 'sourcedata')
+    qc_dir = os.path.join(src_dir, 'QC')
+
+    # Create single QC subject
+    os.makedirs(qc_dir, exist_ok=True)
+
+    # Loop over all Qc study directories in sourcedata
+    # Expect subject/session directory names in the form "Qc_<session ID>_*/<session dir>/"
+    # Move session subdirectories from Qc_*/<session dir> to Qc/<ScanDate>
+
+    for sub_dir in glob(os.path.join(src_dir, 'Qc*')):
+
+        # There should be only one session subdirectory
+        dlist = list(glob(os.path.join(sub_dir, '*')))
+
+        if len(dlist) > 0:
+
+            ses_dir = dlist[0]
+
+            # Get first DICOM file in ses_dir at any level
+            first_dcm = str(list(Path(ses_dir).rglob("*.dcm"))[0])
+
+            # Get acquisition date from DICOM header
+            acq_date = acquisition_date(first_dcm)
+
+            # Destination session directory name in QC subject folder
+            dest_dir = os.path.join(qc_dir, acq_date)
+
+            # Move and rename session subdirectory
+            print('Moving %s to %s' % (ses_dir, dest_dir))
+            os.rename(ses_dir, dest_dir)
+
+        # Delete old Qc_* subject directory
+        print('Deleting %s' % sub_dir)
+        rmtree(sub_dir)
+
+
+def acquisition_date(dcm_fname):
+    """
+    Extract acquisition date from DICOM header
+    :param dcm_fname: DICOM filename
+    :return acq_date: str, acquisition date (YYYYMMDD)
+    """
+
+    # Default return date
+    acq_date = '19010101'
+
+    if not os.path.isfile(dcm_fname):
+        print('* File not found - %s' % dcm_fname)
+
+    try:
+        ds = pydicom.read_file(dcm_fname, force=True)
+    except IOError:
+        print("* Problem opening %s" % dcm_fname)
+        raise
+    except AttributeError:
+        print("* Problem opening %s" % dcm_fname)
+        raise
+
+    if ds:
+        acq_date = ds.AcquisitionDate
+    else:
+        print('* DICOM header problem - returning %s' % acq_date)
+
+    return acq_date
+
+
+if 'main' in __name__:
+
+    main()
