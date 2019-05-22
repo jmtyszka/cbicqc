@@ -1,39 +1,35 @@
 # !/usr/bin/env python
-#
-# QC analysis node for nipype
-# - derive class from
-#
-# USAGE : stats.py <QC Directory>
-#
-# AUTHOR : Mike Tyszka
-# PLACE  : Caltech
-# DATES  : 04/01/2013 JMT From scratch
-#          10/24/2013 JMT Expand to calculate all stats
-#          03/03/2014 JMT Add scanner name argument
-#
-# This file is part of CBICQC.
-#
-#    CBICQC is free software: you can redistribute it and/or modify
-#    it under the terms of the GNU General Public License as published by
-#    the Free Software Foundation, either version 3 of the License, or
-#    (at your option) any later version.
-#
-#    CBICQC is distributed in the hope that it will be useful,
-#    but WITHOUT ANY WARRANTY; without even the implied warranty of
-#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#    GNU General Public License for more details.
-#
-#    You should have received a copy of the GNU General Public License
-#   along with CBICQC.  If not, see <http://www.gnu.org/licenses/>.
-#
-# Copyright 2013-2014 California Institute of Technology.
+"""
+QC analysis node for nipype
 
+AUTHOR : Mike Tyszka
+PLACE  : Caltech
+DATES  : 2019-05-20 JMT Port to
+
+This file is part of CBICQC.
+
+   CBICQC is free software: you can redistribute it and/or modify
+   it under the terms of the GNU General Public License as published by
+   the Free Software Foundation, either version 3 of the License, or
+   (at your option) any later version.
+
+   CBICQC is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License for more details.
+
+   You should have received a copy of the GNU General Public License
+  along with CBICQC.  If not, see <http://www.gnu.org/licenses/>.
+
+Copyright 2019 California Institute of Technology.
+"""
+
+import os
+import nibabel as nb
 
 from nipype.interfaces.base import BaseInterface, \
     BaseInterfaceInputSpec, traits, File, TraitedSpec
 from nipype.utils.filemanip import split_filename
-
-import nibabel as nb
 
 
 class CBICQCInputSpec(BaseInterfaceInputSpec):
@@ -89,8 +85,8 @@ class CBICQC(BaseInterface):
         outputs = self._outputs().get()
 
         mask_fname, ts_fname = self._output_fnames()
-        outputs["roi_mask"] = mask_fname
-        outputs["roi_timeseries"] = ts_fname
+        outputs["roi_mask"] = os.path.abspath(mask_fname)
+        outputs["roi_timeseries"] = os.path.abspath(ts_fname)
 
         return outputs
 

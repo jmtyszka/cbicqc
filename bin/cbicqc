@@ -16,6 +16,7 @@ Dates
 2019-02-25 JMT Fixed arbitrary run ordering (sorted glob)
 2019-03-20 JMT Restructure as PyPI application with BIDS 1.2 compliance
 2019-03-22 JMT Add BIDS validation
+2019-05-20 JMT Port to nipype workflow
 
 MIT License
 
@@ -46,23 +47,42 @@ import os
 import sys
 import argparse
 
-from cbicqc.pipeline import pipeline
+from cbicqc.workflow import QCPipeline
 
 
 def main():
 
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Lightweight daily phantom QC analysis and reporting')
-
     parser.add_argument('-d', '--qcdir', default='.', help='QC dataset directory (BIDS format)')
+    parser.add_argument('--sge', action='store_true', help='Submit QC workflow to Sun Grid Engine')
 
     # Parse command line arguments
     args = parser.parse_args()
     bids_dir = os.path.realpath(args.qcdir)
 
+    # Splash
+    print('')
+    print('-----------------------------')
+    print('CBIC Quality Control Pipeline')
+    print('-----------------------------')
+    print('Version : {}'.format(__version__))
+    print('')
+
     # Analyze all QC runs in the BIDS directory
-    myqc = pipeline(bids_dir)
-    myqc.run()
+    print('Setting up workflow')
+    qc_pipe = QCPipeline(bids_dir)
+
+    qc_wf = qc_pipe.setup_workflow()
+
+    if args.sge:
+        print('Submitting entire workflow to grid engine')
+        print('')
+        qc_wf.run(plugin='SGEGraph', plugin_args={'dont_resubmit_completed_jobs': True})
+    else:
+        print('Running workflow sequentially')
+        print('')
+        qc_wf.run()
 
     # Clean exit
     sys.exit(0)
