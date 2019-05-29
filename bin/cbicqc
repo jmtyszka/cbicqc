@@ -55,7 +55,7 @@ def main():
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Lightweight daily phantom QC analysis and reporting')
     parser.add_argument('-d', '--qcdir', default='.', help='QC dataset directory (BIDS format)')
-    parser.add_argument('--sge', action='store_true', help='Submit QC workflow to Sun Grid Engine')
+    parser.add_argument('-sge', action='store_true', help='Submit QC workflow to Sun Grid Engine')
 
     # Parse command line arguments
     args = parser.parse_args()
@@ -69,10 +69,9 @@ def main():
     print('Version : {}'.format(__version__))
     print('')
 
-    # Analyze all QC runs in the BIDS directory
+    # Setup workflow for QC on all sessions in BIDS directory
     print('Setting up workflow')
     qc_pipe = QCPipeline(bids_dir)
-
     qc_wf = qc_pipe.setup_workflow()
 
     if args.sge:

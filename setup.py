@@ -45,7 +45,7 @@ setup(
     # For a discussion on single-sourcing the version across setup.py and the
     # project code, see
     # https://packaging.python.org/en/latest/single_source_version.html
-    version='0.4.0',  # Required
+    version='0.5.0',  # Required
 
     # This is a one-line description or tagline of what your project does. This
     # corresponds to the "Summary" metadata field:
@@ -145,7 +145,10 @@ setup(
     # https://packaging.python.org/en/latest/requirements.html
     install_requires=['pydicom>=1.2.2',
                       'numpy>=1.15.2',
+                      'scipy',
                       'pybids',
+                      'nibabel',
+                      'nipype',
                       'pynetdicom>=1.2.0'],  # Optional
 
     # List additional groups of dependencies here (e.g. development

@@ -1,10 +1,10 @@
 # !/usr/bin/env python
 """
-QC analysis node for nipype
+CBICQC timeseries analysis node
 
 AUTHOR : Mike Tyszka
 PLACE  : Caltech
-DATES  : 2019-05-20 JMT Port to
+DATES  : 2019-05-22 JMT From scratch
 
 This file is part of CBICQC.
 
@@ -32,47 +32,39 @@ from nipype.interfaces.base import BaseInterface, \
 from nipype.utils.filemanip import split_filename
 
 
-class CBICQCInputSpec(BaseInterfaceInputSpec):
+class TimeseriesInputSpec(BaseInterfaceInputSpec):
 
-    in_file = File(exists=True,
-                   desc='Motion corrected QC volume series',
-                   mandatory=True)
+    moco_img_4d = File(exists=True,
+                    desc='Motion corrected 4D phantom image',
+                    mandatory=True)
 
-    # Example scalar float input
-    # threshold = traits.Float(desc='everything below this value will be set to zero',
-    #                          mandatory=True)
+    roi_img_3d = File(exists=True,
+                    desc='ROI 3D image',
+                    mandatory=True)
+
+class TimeseriesOutputSpec(TraitedSpec):
+
+    roi_timeseries = File(exists=False,
+                          desc="ROI timeseries extracted from motion corrected phantom images")
 
 
-class CBICQCOutputSpec(TraitedSpec):
+class Timeseries(BaseInterface):
 
-    roi_mask = File(exists=False, desc="Phantom ROI mask")
-    roi_timeseries = File(exists=False, desc="Timeseries for each ROI")
-
-
-class CBICQC(BaseInterface):
-
-    input_spec = CBICQCInputSpec
-    output_spec = CBICQCOutputSpec
+    input_spec = TimeseriesInputSpec
+    output_spec = TimeseriesOutputSpec
 
     def _run_interface(self, runtime):
 
         import numpy as np
         import pandas as pd
 
-        qc_fname = self.inputs.in_file
+        # Load 4D motion corrected image
+        moco_nii = nb.load(self.inputs.moco_img_4d)
+        moco_data = np.array(moco_nii.get_data())
 
-        # Load QC motion corrected 4D data
-        qc_nii = nb.load(qc_fname)
-        qc_data = np.array(qc_nii.get_data())
-
-        # Create 3D ROI mask
-        mask_data = np.ones(qc_data.shape[0:2])
-
-        mask_fname, ts_fname = self._output_fnames()
-
-        # Save ROI mask
-        mask_nii = nb.Nifti1Image(mask_data, qc_nii.get_affine())
-        nb.save(mask_nii, mask_fname)
+        # Load 3D ROI mask image
+        roi_nii = nb.load(self.inputs.roi_img_3d)
+        roi_data = np.array(roi_nii.get_data())
 
         # Save ROI timeseries
         roi_ts_df = pd.DataFrame(np.random.randn(100,3))
@@ -89,17 +81,6 @@ class CBICQC(BaseInterface):
         outputs["roi_timeseries"] = os.path.abspath(ts_fname)
 
         return outputs
-
-    def _output_fnames(self):
-
-        qc_fname = self.inputs.in_file
-        _, fstub, _ = split_filename(qc_fname)
-
-        # Construct derived filenames
-        mask_fname = fstub + '_mask.nii.gz'
-        ts_fname = fstub + '_roi_timeseries.csv'
-
-        return mask_fname, ts_fname
 
 
 # # Main function

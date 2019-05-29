@@ -1,246 +1,110 @@
-#!/usr/bin/env python
-#
-# Create daily QC HTML report
-#
-# USAGE : report.py <QC Directory>
-#
-# AUTHOR : Mike Tyszka
-# PLACE  : Caltech
-# DATES  : 09/25/2013 JMT From scratch
-#          10/23/2013 JMT Add com external call
-#          10/24/2013 JMT Move stats calcs to new stats.py
-#
-# This file is part of CBICQC.
-#
-#    CBICQC is free software: you can redistribute it and/or modify
-#    it under the terms of the GNU General Public License as published by
-#    the Free Software Foundation, either version 3 of the License, or
-#    (at your option) any later version.
-#
-#    CBICQC is distributed in the hope that it will be useful,
-#    but WITHOUT ANY WARRANTY; without even the implied warranty of
-#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#    GNU General Public License for more details.
-#
-#    You should have received a copy of the GNU General Public License
-#   along with CBICQC.  If not, see <http://www.gnu.org/licenses/>.
-#
-# Copyright 2013-2014 California Institute of Technology.
+#!/usr/bin/env python3
+"""
+Create HTML report from QC analysis results
+
+AUTHORS
+----
+Mike Tyszka, Ph.D., Caltech Brain Imaging Center
+
+DATES
+----
+2013-09-25 JMT From scratch
+2013-10-23 JMT Add com external call
+2013-10-24 JMT Move stats calcs to new stats.py
+2019-05-28 JMT Recode as a nipype interface class
+
+MIT License
+
+Copyright (c) 2019 Mike Tyszka
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+"""
 
 import sys
 import os
 import string
 import numpy as np
+
 from pylab import *
 
-# Define template
-TEMPLATE_FORMAT = """
-<html>
+from reportlab.lib.enums import TA_JUSTIFY
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
 
-<head>
-<STYLE TYPE="text/css">
-BODY {
-  font-family    : sans-serif;
-}
-td {
-  padding-left   : 10px;
-  padding-right  : 10px;
-  padding-top    : 0px;
-  padding-bottom : 0px;
-  vertical-align : top;
-}
-</STYLE>
-</head>
+from nipype.utils.filemanip import split_filename
+from nipype.interfaces.base import (BaseInterface,
+                                    BaseInterfaceInputSpec,
+                                    File,
+                                    TraitedSpec)
 
-<body>
 
-<h1 style="background-color:#E0E0FF">CBIC Daily QC Report</h1>
+class ReportInputSpec(BaseInterfaceInputSpec):
 
-<table>
-<tr>
+    mcf = File(exists=True,
+               mandatory=True,
+               desc='Motion corrected 4D timeseries')
 
-<!-- Scanner and acquisition info -->
-<td>
-  <table>
-  <tr> <td> <b>Acquisition Date</b> <td bgcolor="#E0FFE0"> <b>$acq_date</b> </tr>
-  <tr> <td> <b>Scanner ID</b>       <td> $scanner_serno </tr>
-  <tr> <td> <b>Frequency</b>        <td> $scanner_freq MHz </tr>
-  <tr> <td> <b>TR</b>               <td> $TR_ms ms </tr>
-  <tr> <td> <b>Volumes</b>          <td> $num_volumes </tr>
-  </table>
-</td>
 
-<!-- SNR and absolute signal info -->
-<td>
-  <table>
-  <tr> <td> <b>SNR Phantom</b>      <td bgcolor="#E0FFE0"> <b>$phantom_snr</b> </tr>
-  <tr> <td> <b>SNR Nyquist</b>      <td> $nyquist_snr </tr>
-  <tr> <td> <b>Mean Phantom</b>     <td> $phantom_mean
-  <tr> <td> <b>Mean Nyquist</b>     <td> $nyquist_mean
-  <tr> <td> <b>Mean Noise</b>       <td> $noise_mean
-  </table>
-</td>
+class ReportOutputSpec(TraitedSpec):
 
-<!-- Spikes and drift -->
-<td>
-  <table>
-  <tr> <td> <b>Phantom Spikes</b>   <td> $phantom_spikes </tr>
-  <tr> <td> <b>Nyquist Spikes</b>   <td> $nyquist_spikes </tr>
-  <tr> <td> <b>Noise Spikes</b>     <td> $noise_spikes </tr>
-  <tr> <td> <b>Phantom Drift</b>   <td> $phantom_drift % </tr>
-  <tr> <td> <b>Nyquist Drift</b>   <td> $nyquist_drift % </tr>
-  <tr> <td> <b>Noise Drift</b>     <td> $noise_drift % </tr>
-  </table>
-</td>
+    report_pdf = File(exists=False, desc="Quality control report")
 
-<!-- Center of mass and apparent motion -->
-<td>
-  <table>
-  <tr> <td> <b>CofM (mm)</b>        <td> ($com_x, $com_y, $com_z)
-  <tr> <td> <b>Max Disp (um)</b>    <td> ($max_adx, $max_ady, $max_adz)
-  </table>
-</td>
 
-<br><br>
+class Report(BaseInterface):
 
-<!-- Plotted timeseries -->
-<table>
+    input_spec = ReportInputSpec
+    output_spec = ReportOutputSpec
 
-<tr>
-<td> <h3>Signal, Drift and Noise</h3>
-<td> <h3>Temporal Summary Images and Masks</h3>
-</tr>
+    def _run_interface(self, runtime):
 
-<tr>
-<td valign="top"><img src=qc_timeseries.png />
-<td valign="top">
-<b>tMean</b><br> <img src=qc_mean_ortho.png /><br><br>
-<b>tSD</b><br> <img src=qc_sd_ortho.png /><br><br>
-<b>Region Mask</b><br> <img src=qc_mask_ortho.png /><br><br>
-</tr>
+        pdf_fname = self._report_fname()
 
-</table>
+        doc = SimpleDocTemplate(pdf_fname,
+                                pagesize=letter,
+                                rightMargin=72,
+                                leftMargin=72,
+                                topMargin=72,
+                                bottomMargin=18)
 
-"""
+        styles = getSampleStyleSheet()
+        styles.add(ParagraphStyle(name='Justify', alignment=TA_JUSTIFY))
 
-# Main function
-def main():
-    
-    # Get QC daily directory from command line args
-    if len(sys.argv) > 1:
-        qc_dir = sys.argv[1]
-    else:
-        qc_dir = os.getcwd()
-    
-    print('  Creating daily QC report for ' + qc_dir)
+        Story = []
 
-    #
-    # QC Acquisition Info
-    #
+        ptext = '<font size=24>CBIC Quality Control Report</font>'
+        Story.append(Paragraph(ptext, styles['Justify']))
+        Story.append(Spacer(1, 12))
 
-    # Load QC acquisition info
-    qc_info_file = os.path.join(qc_dir, 'qc_info.txt')
-    x = np.loadtxt(qc_info_file)
-    
-    # Parse QC info
-    scanner_serno = x[0]
-    acq_date      = "%d" % (x[1])
-    scanner_freq  = x[2]
-    TR_ms         = x[3]
-    num_volumes   = x[4]
+        doc.build(Story)
 
-    # Convert acquisition date to ISO format
-    YYYY = acq_date[0:4]
-    MM   = acq_date[4:6]
-    DD   = acq_date[6:8]
-    acq_date = YYYY + '-' + MM + '-' + DD
+        return runtime
 
-    # # Plot figures
-    # fig = figure(figsize=(10, 8))
-    #
-    # subplot(411)
-    # plot(v, phantom_t, 'ro', v, phantom_fit, '-b', v, phantom_0, '-g')
-    # title("Phantom", x=0.5, y=0.8)
-    #
-    # subplot(412)
-    # plot(v, nyquist_t, 'ro', v, nyquist_fit, '-b', v, nyquist_0, '-g')
-    # title("Nyquist", x=0.5, y=0.8)
-    #
-    # subplot(413)
-    # plot(v, noise_t, 'ro', v, noise_fit, '-b', v, noise_0, '-g')
-    # title("Noise", x=0.5, y=0.8)
-    #
-    # subplot(414)
-    # plot(v, dx, 'r', v, dy, 'g', v, dz, 'b')
-    # title("Displacement (mm)", x=0.5, y=0.8)
-    #
-    # # Pack all subplots and labels tightly
-    # fig.subplots_adjust(hspace=0.2)
-    #
-    # # Save figure in QC directory
-    # savefig(os.path.join(qc_dir, 'qc_timeseries.png'), dpi=72, bbox_inches='tight')
- 
-    #
-    # QC statistics
-    #
+    def _list_outputs(self):
 
-    # Construct stats parameter filename
-    qc_stats_parfile = os.path.join(qc_dir, 'qc_stats.txt')
-    
-    if not os.path.isfile(qc_stats_parfile):
-        print(qc_stats_parfile + ' does not exist - exiting')
-        sys.exit(1)
-        
-    # Load stats parameters from qc_stats.pars file in the daily QC directory
-    print('  Loading stats parameters from ' + qc_stats_parfile)
-    x = np.loadtxt(qc_stats_parfile)
+        outputs = self._outputs().get()
+        outputs['report_pdf'] = self._report_fname()
 
-    # Parse parameters (in columns for each ROI)
-    phantom_a, phantom_tau, phantom_b, phantom_mean, phantom_spikes, phantom_drift = x[0:6]
-    nyquist_a, nyquist_tau, nyquist_b, nyquist_mean, nyquist_spikes, nyquist_drift = x[6:12]
-    noise_a, noise_tau, noise_b, noise_mean, noise_spikes, noise_drift             = x[12:18]
-    phantom_snr, nyquist_snr  = x[18:20]
-    com_x, com_y, com_z       = x[20:23]
-    max_adx, max_ady, max_adz = x[23:26]
+        return outputs
 
-    #
-    # HTML report generation
-    #
+    def _report_fname(self):
 
-    # Create substitution dictionary for HTML report
-    qc_dict = dict([
-      ('scanner_serno',  "%d"    % (scanner_serno)),
-      ('acq_date',       "%s"    % (acq_date)),
-      ('scanner_freq',   "%0.4f" % (scanner_freq)),
-      ('TR_ms',          "%0.1f" % (TR_ms)),
-      ('num_volumes',    "%d"    % (num_volumes)),
-      ('phantom_mean',   "%0.1f" % (phantom_mean)),
-      ('nyquist_mean',   "%0.1f" % (nyquist_mean)),
-      ('noise_mean',     "%0.1f" % (noise_mean)),
-      ('phantom_snr',    "%0.1f" % (phantom_snr)),
-      ('nyquist_snr',    "%0.1f" % (nyquist_snr)),
-      ('phantom_spikes', "%d"    % (phantom_spikes)),
-      ('nyquist_spikes', "%d"    % (nyquist_spikes)),
-      ('noise_spikes',   "%d"    % (noise_spikes)),
-      ('phantom_drift',  "%0.1f" % (phantom_drift)),
-      ('nyquist_drift',  "%0.1f" % (nyquist_drift)),
-      ('noise_drift',    "%0.1f" % (noise_drift)),
-      ('com_x',          "%0.2f" % (com_x)),
-      ('com_y',          "%0.2f" % (com_y)),
-      ('com_z',          "%0.2f" % (com_y)),
-      ('max_adx',        "%0.1f" % (max_adx)),
-      ('max_ady',        "%0.1f" % (max_ady)),
-      ('max_adz',        "%0.1f" % (max_adz))
-    ])
-
-    # Generate HTML report from template (see above)
-    TEMPLATE = string.Template(TEMPLATE_FORMAT)
-    html_data = TEMPLATE.safe_substitute(qc_dict)
-    
-    # Write HTML report page
-    qc_report_file = os.path.join(qc_dir, 'index.html')
-    open(qc_report_file, "w").write(html_data)
-
-# This is the standard boilerplate that calls the main() function.
-if __name__ == '__main__':
-    main()
+        _, stub, _ = split_filename(self.inputs.mean_img)
+        return os.path.abspath(stub + '_report.pdf')
