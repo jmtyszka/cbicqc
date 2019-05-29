@@ -149,6 +149,7 @@ setup(
                       'pybids',
                       'nibabel',
                       'nipype',
+                      'reportlab',
                       'pynetdicom>=1.2.0'],  # Optional
 
     # List additional groups of dependencies here (e.g. development

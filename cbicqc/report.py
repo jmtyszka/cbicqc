@@ -36,18 +36,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-import sys
 import os
-import string
-import numpy as np
-
-from pylab import *
-
-from reportlab.lib.enums import TA_JUSTIFY
-from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import inch
 
 from nipype.utils.filemanip import split_filename
 from nipype.interfaces.base import (BaseInterface,
@@ -75,6 +64,12 @@ class Report(BaseInterface):
 
     def _run_interface(self, runtime):
 
+        import datetime as dt
+        from reportlab.lib.enums import TA_JUSTIFY
+        from reportlab.lib.pagesizes import letter
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+
         pdf_fname = self._report_fname()
 
         doc = SimpleDocTemplate(pdf_fname,
@@ -87,13 +82,19 @@ class Report(BaseInterface):
         styles = getSampleStyleSheet()
         styles.add(ParagraphStyle(name='Justify', alignment=TA_JUSTIFY))
 
-        Story = []
+        # Init document contents
+        contents = []
 
         ptext = '<font size=24>CBIC Quality Control Report</font>'
-        Story.append(Paragraph(ptext, styles['Justify']))
-        Story.append(Spacer(1, 12))
+        contents.append(Paragraph(ptext, styles['Justify']))
+        contents.append(Spacer(1, 12))
 
-        doc.build(Story)
+        timestamp = 'Timestamp: {:%Y-%m-%d %H:%M:%S}'.format(dt.datetime.now())
+        ptext = '<font size=12>Generated automatically by CBICQC on {}</font>'.format(timestamp)
+        contents.append(Paragraph(ptext, styles['Justify']))
+        contents.append(Spacer(1, 12))
+
+        doc.build(contents)
 
         return runtime
 
@@ -108,4 +109,4 @@ class Report(BaseInterface):
 
         # Derive report filename from moco filename
         _, stub, _ = split_filename(self.inputs.mcf)
-        return os.path.abspath(stub.replace('_mcf','') + '_report.pdf')
+        return os.path.abspath(stub.replace('_mcf', '') + '_report.pdf')
