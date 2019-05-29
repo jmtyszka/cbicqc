@@ -106,5 +106,6 @@ class Report(BaseInterface):
 
     def _report_fname(self):
 
-        _, stub, _ = split_filename(self.inputs.mean_img)
-        return os.path.abspath(stub + '_report.pdf')
+        # Derive report filename from moco filename
+        _, stub, _ = split_filename(self.inputs.mcf)
+        return os.path.abspath(stub.replace('_mcf','') + '_report.pdf')
