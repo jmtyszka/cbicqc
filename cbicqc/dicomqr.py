@@ -65,7 +65,7 @@ class QCRetriever:
     def load_config(self):
 
         home_dir = os.environ.get('HOME')
-        cfg_json = os.path.join(home_dir, '.cbicqc.json')
+        cfg_json = os.path.join(home_dir, '.__main__.py.json')
 
         if os.path.isfile(cfg_json):
 

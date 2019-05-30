@@ -41,11 +41,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-__version__ = '0.5.0'
-
 import os
 import sys
 import argparse
+import pkg_resources
 
 from cbicqc.workflow import QCPipeline
 
@@ -54,19 +53,22 @@ def main():
 
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Lightweight daily phantom QC analysis and reporting')
-    parser.add_argument('-d', '--qcdir', default='.', help='QC dataset directory (BIDS format)')
+    parser.add_argument('-d', '--qcdir', required=True, help='QC dataset directory (BIDS format)')
     parser.add_argument('-sge', action='store_true', help='Submit QC workflow to Sun Grid Engine')
 
     # Parse command line arguments
     args = parser.parse_args()
     bids_dir = os.path.realpath(args.qcdir)
 
+    # Read version from setup.py
+    ver = pkg_resources.get_distribution('cbicqc').version
+
     # Splash
     print('')
     print('-----------------------------')
     print('CBIC Quality Control Pipeline')
     print('-----------------------------')
-    print('Version : {}'.format(__version__))
+    print('Version : {}'.format(ver))
     print('')
 
     # Setup workflow for QC on all sessions in BIDS directory

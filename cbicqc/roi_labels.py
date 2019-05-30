@@ -29,6 +29,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
+__version__ = '2019.05.29'
+
 import os
 import nibabel as nb
 from skimage.filters import threshold_otsu

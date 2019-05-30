@@ -12,6 +12,7 @@ DATES
 2013-10-23 JMT Add com external call
 2013-10-24 JMT Move stats calcs to new stats.py
 2019-05-28 JMT Recode as a nipype interface class
+2019-05-29 JMT Expand to multiple pages
 
 MIT License
 
@@ -44,69 +45,138 @@ from nipype.interfaces.base import (BaseInterface,
                                     File,
                                     TraitedSpec)
 
+import datetime as dt
+from reportlab.lib.enums import TA_JUSTIFY
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import (SimpleDocTemplate,
+                                Paragraph,
+                                Spacer,
+                                Image,
+                                Table,
+                                TableStyle,
+                                PageBreak)
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
 
-class ReportInputSpec(BaseInterfaceInputSpec):
+
+class QCReportInputSpec(BaseInterfaceInputSpec):
 
     mcf = File(exists=True,
                mandatory=True,
                desc='Motion corrected 4D timeseries')
 
+    tmean = File(exists=True,
+                 mandatory=True,
+                 desc='Motion corrected temporal mean image')
 
-class ReportOutputSpec(TraitedSpec):
+
+class QCReportOutputSpec(TraitedSpec):
 
     report_pdf = File(exists=False, desc="Quality control report")
 
 
-class Report(BaseInterface):
+class QCReport(BaseInterface):
 
-    input_spec = ReportInputSpec
-    output_spec = ReportOutputSpec
+    input_spec = QCReportInputSpec
+    output_spec = QCReportOutputSpec
+
+    def __init__(self):
+
+        super().__init__()
+
+        self._pdf_fname = ''
+        self._contents = []
+
+        # Add a justified paragraph style
+        self._pstyles = getSampleStyleSheet()
+        self._pstyles.add(ParagraphStyle(name='Justify', alignment=TA_JUSTIFY))
 
     def _run_interface(self, runtime):
 
-        import datetime as dt
-        from reportlab.lib.enums import TA_JUSTIFY
-        from reportlab.lib.pagesizes import letter
-        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
-        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        self._init_pdf()
+        self._add_summary()
+        self._add_slices()
 
-        pdf_fname = self._report_fname()
-
-        doc = SimpleDocTemplate(pdf_fname,
-                                pagesize=letter,
-                                rightMargin=72,
-                                leftMargin=72,
-                                topMargin=72,
-                                bottomMargin=18)
-
-        styles = getSampleStyleSheet()
-        styles.add(ParagraphStyle(name='Justify', alignment=TA_JUSTIFY))
-
-        # Init document contents
-        contents = []
-
-        ptext = '<font size=24>CBIC Quality Control Report</font>'
-        contents.append(Paragraph(ptext, styles['Justify']))
-        contents.append(Spacer(1, 12))
-
-        timestamp = 'Timestamp: {:%Y-%m-%d %H:%M:%S}'.format(dt.datetime.now())
-        ptext = '<font size=12>Generated automatically by CBICQC on {}</font>'.format(timestamp)
-        contents.append(Paragraph(ptext, styles['Justify']))
-        contents.append(Spacer(1, 12))
-
-        doc.build(contents)
+        self._doc.build(self._contents)
 
         return runtime
 
     def _list_outputs(self):
 
         outputs = self._outputs().get()
-        outputs['report_pdf'] = self._report_fname()
+        outputs['report_pdf'] = self._pdf_fname
 
         return outputs
 
-    def _report_fname(self):
+    def _init_pdf(self):
 
         # Derive report filename from moco filename
         _, stub, _ = split_filename(self.inputs.mcf)
-        return os.path.abspath(stub.replace('_mcf', '') + '_report.pdf')
+        self._pdf_fname = os.path.abspath(stub.replace('_mcf', '') + '_report.pdf')
+
+        # Create a new PDF document
+        self._doc = SimpleDocTemplate(self._pdf_fname,
+                                      pagesize=letter,
+                                      rightMargin=0.5 * inch,
+                                      leftMargin=0.5 * inch,
+                                      topMargin=1.0 * inch,
+                                      bottomMargin=1.0 * inch)
+
+    def _add_summary(self):
+
+        ptext = '<font size=24>CBIC Quality Control Report</font>'
+        self._contents.append(Paragraph(ptext, self._pstyles['Justify']))
+        self._contents.append(Spacer(1, 0.5 * inch))
+
+        timestamp = dt.datetime.now().strftime('%Y-%m-%d at %H:%M:%S')
+        ptext = '<font size=12>Generated automatically by CBICQC on {}</font>'.format(timestamp)
+        self._contents.append(Paragraph(ptext, self._pstyles['Justify']))
+        self._contents.append(Spacer(1, 0.5 * inch))
+
+        #
+        # Session information
+        #
+
+        ptext = '<font size=12>Session Information</font>'
+        self._contents.append(Paragraph(ptext, self._pstyles['Justify']))
+        self._contents.append(Spacer(1, 0.25 * inch))
+
+        info = [['Subject', 'QC'],
+                ['Session', '20180531'],
+                ['Scan Time', '10:23'],
+                ['TR (ms)', '1000.0'],
+                ['TE (ms)', '30.0'],
+                ['Volumes', '300'],
+                ['Voxel Size (mm)', '3.0 x 3.0 x 3.0']]
+
+        info_table = Table(info)
+
+        self._contents.append(info_table)
+        self._contents.append(Spacer(1, 0.25 * inch))
+
+        #
+        # QC metrics
+        #
+
+        ptext = '<font size=12>Quality Metrics</font>'
+        self._contents.append(Paragraph(ptext, self._pstyles['Justify']))
+        self._contents.append(Spacer(1, 0.25 * inch))
+
+        qc_metrics = [['Phantom Temporal SNR', '100.0'],
+                      ['Nyquist Temporal SNR', '20.0']]
+
+        qc_table = Table(qc_metrics)
+
+        self._contents.append(qc_table)
+        self._contents.append(Spacer(1, 0.25 * inch))
+
+    def _add_slices(self):
+
+        # Page break
+        self._contents.append(PageBreak())
+
+        ptext = '<font size=12>Temporal Mean Image</font>'
+        self._contents.append(Paragraph(ptext, self._pstyles['Justify']))
+        self._contents.append(Spacer(1, 0.25 * inch))
+
+

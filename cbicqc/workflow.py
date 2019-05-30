@@ -43,7 +43,8 @@ from nipype.interfaces.io import BIDSDataGrabber, DataSink
 from nipype.interfaces import fsl
 
 from .roi_labels import ROILabels
-from .report import Report
+from .report import QCReport
+from .stats import QCStats
 
 
 class QCPipeline:
@@ -92,10 +93,16 @@ class QCPipeline:
         moco.inputs.save_mats = True
         moco.inputs.save_plots = True
 
+        # Temporal mean image following moco
+        tmean = pe.MapNode(interface=fsl.MeanImage(),
+                           name='tmean',
+                           iterfield=['in_file'])
+        tmean.inputs.dimension = 'T'
+
         # Generate HTML report from all analysis results
-        report = pe.MapNode(interface=Report(),
+        report = pe.MapNode(interface=QCReport(),
                             name='report',
-                            iterfield=['mcf'])
+                            iterfield=['mcf', 'tmean'])
 
         # Save QC analysis results in <bids_root>/derivatives/cbicqc
         datasink = pe.Node(interface=DataSink(), name='datasink')
@@ -107,7 +114,10 @@ class QCPipeline:
         wf.connect([
             (imgsrc, moco, [('qc', 'in_file')]),
             (moco, report, [('out_file', 'mcf')]),
-            (report, datasink, [('report_pdf', 'reports.@report')])
+            (moco, tmean, [('out_file', 'in_file')]),
+            (tmean, report, [('out_file', 'tmean')]),
+            (report, datasink, [('report_pdf', 'reports.@report')]),
+            (tmean, datasink, [('out_file', 'resources.@tmean')])
             ])
 
         return wf
