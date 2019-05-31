@@ -10,6 +10,7 @@ Mike Tyszka, Caltech Brain Imaging Center
 Dates
 ----
 2019-03-28 JMT From scratch
+2019-05-30 JMT Move QC workflow to separate class and interface
 
 MIT License
 
@@ -39,15 +40,14 @@ import os
 from bids import BIDSLayout
 
 import nipype.pipeline.engine as pe
-from nipype.interfaces.io import BIDSDataGrabber, DataSink
-from nipype.interfaces import fsl
+from nipype.interfaces.io import DataSink
+from nipype.interfaces import fsl, IdentityInterface
 
-from .roi_labels import ROILabels
 from .report import QCReport
-from .stats import QCStats
+from .interfaces import CBICQCInterface
 
 
-class QCPipeline:
+class CBICQCWorkflow:
 
     def __init__(self, bids_dir):
 
@@ -55,37 +55,25 @@ class QCPipeline:
         self._work_dir = os.path.join(bids_dir, 'work')
         self._derivatives_dir = os.path.join(bids_dir, 'derivatives')
 
-    def setup_workflow(self):
+        # Index BIDS directory
+        self._layout = BIDSLayout(self._bids_dir,
+                                  absolute_paths=True,
+                                  ignore=['work', 'derivatives', 'exclude'])
+        subject_list = self._layout.get_subjects()
+        session_list = self._layout.get_sessions()
 
         # Main workflow
-        wf = pe.Workflow(name='cbicqc')
-        wf.base_dir = self._work_dir
-
-        # BIDS layout search
-        bids_layout = BIDSLayout(self._bids_dir,
-                                 absolute_paths=True,
-                                 ignore=['work', 'derivatives', 'exclude'])
-        subject_list = bids_layout.get_subjects()
-        session_list = bids_layout.get_sessions()
+        self._wf = pe.Workflow(name='cbicqc')
+        self._wf.base_dir = self._work_dir
 
         # See https://miykael.github.io/nipype_tutorial/notebooks/basic_data_input_bids.html
         # for approach to loading BIDS image and metadata
 
-        # BIDS QC grabber - iterates over provided subject and session lists
-        imgsrc = pe.Node(interface=BIDSDataGrabber(infields=['subject', 'session']),
-                          name='imgsrc')
-        imgsrc.inputs.base_dir = self._bids_dir
-        imgsrc.inputs.index_derivatives = False
-        imgsrc.raise_on_empty = True
-        imgsrc.iterables = [('subject', subject_list),
-                             ('session', session_list)]
-        imgsrc.inputs.output_query = {
-            'qc': {'datatype': 'anat',
-                   'suffix': 'T2star',
-                   'extensions': ['nii', 'nii.gz']}
-        }
+        # Setup driving iterator node
+        driver = pe.Node(interface=IdentityInterface(), name='driver')
+        driver.iterables = ['subject', 'session']
 
-        # Motion correction
+        # Motion correction - FSL MCFLIRT
         moco = pe.MapNode(interface=fsl.MCFLIRT(),
                           name='moco',
                           iterfield=['in_file'])
@@ -93,16 +81,10 @@ class QCPipeline:
         moco.inputs.save_mats = True
         moco.inputs.save_plots = True
 
-        # Temporal mean image following moco
-        tmean = pe.MapNode(interface=fsl.MeanImage(),
-                           name='tmean',
-                           iterfield=['in_file'])
-        tmean.inputs.dimension = 'T'
-
-        # Generate HTML report from all analysis results
-        report = pe.MapNode(interface=QCReport(),
-                            name='report',
-                            iterfield=['mcf', 'tmean'])
+        # Quality analysis
+        quality = pe.MapNode(interface=CBICQCInterface(infields=['subject', 'session']))
+        quality.subject = []
+        quality.session = []
 
         # Save QC analysis results in <bids_root>/derivatives/cbicqc
         datasink = pe.Node(interface=DataSink(), name='datasink')
@@ -111,15 +93,24 @@ class QCPipeline:
         datasink.inputs.parameterization = False
 
         # Connect up workflow
-        wf.connect([
-            (imgsrc, moco, [('qc', 'in_file')]),
-            (moco, report, [('out_file', 'mcf')]),
-            (moco, tmean, [('out_file', 'in_file')]),
-            (tmean, report, [('out_file', 'tmean')]),
-            (report, datasink, [('report_pdf', 'reports.@report')]),
-            (tmean, datasink, [('out_file', 'resources.@tmean')])
-            ])
+        # self._wf.connect([
+        #     (imgsrc, moco, [('qc', 'in_file')]),
+        #     (moco, report, [('out_file', 'mcf')]),
+        #     (moco, tmean, [('out_file', 'in_file')]),
+        #     (tmean, report, [('out_file', 'tmean')]),
+        #     (report, datasink, [('report_pdf', 'reports.@report')]),
+        #     (tmean, datasink, [('out_file', 'resources.@tmean')])
+        #     ])
 
-        return wf
+    def run(self, sge=False):
+
+        if sge:
+            print('Submitting entire workflow to grid engine')
+            print('')
+            self._wf.run(plugin='SGEGraph', plugin_args={'dont_resubmit_completed_jobs': True})
+        else:
+            print('Running workflow sequentially')
+            print('')
+            self._wf.run()
 
 

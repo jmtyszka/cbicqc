@@ -25,63 +25,19 @@ Copyright 2019 California Institute of Technology.
 """
 
 import os
+import numpy as np
 import nibabel as nb
+import pandas as pd
 
-from nipype.interfaces.base import BaseInterface, \
-    BaseInterfaceInputSpec, traits, File, TraitedSpec
-from nipype.utils.filemanip import split_filename
+def temporal_mean(qc_moco):
 
+    tmean = nb.Nifti1Image()
 
-class TimeseriesInputSpec(BaseInterfaceInputSpec):
+    return tmean
 
-    moco_img_4d = File(exists=True,
-                    desc='Motion corrected 4D phantom image',
-                    mandatory=True)
+def extract_timeseries(qc_moco, roi_labels):
 
-    roi_img_3d = File(exists=True,
-                    desc='ROI 3D image',
-                    mandatory=True)
-
-class TimeseriesOutputSpec(TraitedSpec):
-
-    roi_timeseries = File(exists=False,
-                          desc="ROI timeseries extracted from motion corrected phantom images")
-
-
-class Timeseries(BaseInterface):
-
-    input_spec = TimeseriesInputSpec
-    output_spec = TimeseriesOutputSpec
-
-    def _run_interface(self, runtime):
-
-        import numpy as np
-        import pandas as pd
-
-        # Load 4D motion corrected image
-        moco_nii = nb.load(self.inputs.moco_img_4d)
-        moco_data = np.array(moco_nii.get_data())
-
-        # Load 3D ROI mask image
-        roi_nii = nb.load(self.inputs.roi_img_3d)
-        roi_data = np.array(roi_nii.get_data())
-
-        # Save ROI timeseries
-        roi_ts_df = pd.DataFrame(np.random.randn(100,3))
-        roi_ts_df.to_csv(ts_fname)
-
-        return runtime
-
-    def _list_outputs(self):
-
-        outputs = self._outputs().get()
-
-        mask_fname, ts_fname = self._output_fnames()
-        outputs["roi_mask"] = os.path.abspath(mask_fname)
-        outputs["roi_timeseries"] = os.path.abspath(ts_fname)
-
-        return outputs
-
+    return []
 
 # # Main function
 # def main():
@@ -229,13 +185,9 @@ class Timeseries(BaseInterface):
 #     print('    Writing detrended timeseries')
 #     ts_detrend_file = os.path.join(qc_dir, 'qc_timeseries_detrend.txt')
 #     np.savetxt(ts_detrend_file, ts_detrend, delimiter=' ', fmt='%0.6f')
-#
-#
-#
-#     # Done
-#     print('  Finished python statistical analysis')
-#
-#
-# # Exponential + linear detrending model
-# def explin(t, a, tau, b):
-#     return a * np.exp(-t / tau) + b * t
+
+
+
+def explin(t, a, tau, b):
+    # Exponential + linear detrending model
+    return a * np.exp(-t / tau) + b * t

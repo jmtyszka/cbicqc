@@ -38,14 +38,8 @@ SOFTWARE.
 """
 
 import os
-
-from nipype.utils.filemanip import split_filename
-from nipype.interfaces.base import (BaseInterface,
-                                    BaseInterfaceInputSpec,
-                                    File,
-                                    TraitedSpec)
-
 import datetime as dt
+
 from reportlab.lib.enums import TA_JUSTIFY
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import (SimpleDocTemplate,
@@ -59,39 +53,17 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 
 
-class QCReportInputSpec(BaseInterfaceInputSpec):
+class PDFReport:
 
-    mcf = File(exists=True,
-               mandatory=True,
-               desc='Motion corrected 4D timeseries')
+    def __init__(self, work_dir):
 
-    tmean = File(exists=True,
-                 mandatory=True,
-                 desc='Motion corrected temporal mean image')
+        self.filename = os.path.join(work_dir, 'cbicqc_report.pdf')
 
-
-class QCReportOutputSpec(TraitedSpec):
-
-    report_pdf = File(exists=False, desc="Quality control report")
-
-
-class QCReport(BaseInterface):
-
-    input_spec = QCReportInputSpec
-    output_spec = QCReportOutputSpec
-
-    def __init__(self):
-
-        super().__init__()
-
-        self._pdf_fname = ''
         self._contents = []
 
         # Add a justified paragraph style
         self._pstyles = getSampleStyleSheet()
         self._pstyles.add(ParagraphStyle(name='Justify', alignment=TA_JUSTIFY))
-
-    def _run_interface(self, runtime):
 
         self._init_pdf()
         self._add_summary()
@@ -99,23 +71,10 @@ class QCReport(BaseInterface):
 
         self._doc.build(self._contents)
 
-        return runtime
-
-    def _list_outputs(self):
-
-        outputs = self._outputs().get()
-        outputs['report_pdf'] = self._pdf_fname
-
-        return outputs
-
     def _init_pdf(self):
 
-        # Derive report filename from moco filename
-        _, stub, _ = split_filename(self.inputs.mcf)
-        self._pdf_fname = os.path.abspath(stub.replace('_mcf', '') + '_report.pdf')
-
         # Create a new PDF document
-        self._doc = SimpleDocTemplate(self._pdf_fname,
+        self._doc = SimpleDocTemplate(self.filename,
                                       pagesize=letter,
                                       rightMargin=0.5 * inch,
                                       leftMargin=0.5 * inch,
