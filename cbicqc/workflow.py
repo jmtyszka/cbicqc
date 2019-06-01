@@ -43,7 +43,6 @@ import nipype.pipeline.engine as pe
 from nipype.interfaces.io import DataSink
 from nipype.interfaces import fsl, IdentityInterface
 
-from .report import QCReport
 from .interfaces import CBICQCInterface
 
 
@@ -59,8 +58,13 @@ class CBICQCWorkflow:
         self._layout = BIDSLayout(self._bids_dir,
                                   absolute_paths=True,
                                   ignore=['work', 'derivatives', 'exclude'])
+
+        # Extract lists from BIDS layout
         subject_list = self._layout.get_subjects()
         session_list = self._layout.get_sessions()
+        qc_list = self._layout.get(return_type='file',
+                                   suffix='T2star',
+                                   extension=['.nii', '.nii.gz'])
 
         # Main workflow
         self._wf = pe.Workflow(name='cbicqc')
@@ -70,8 +74,10 @@ class CBICQCWorkflow:
         # for approach to loading BIDS image and metadata
 
         # Setup driving iterator node
-        driver = pe.Node(interface=IdentityInterface(), name='driver')
-        driver.iterables = ['subject', 'session']
+        driver = pe.Node(interface=IdentityInterface(fields=['subject', 'session']),
+                         name='driver')
+        driver.iterables = [('subject', subject_list),
+                            ('session', session_list)]
 
         # Motion correction - FSL MCFLIRT
         moco = pe.MapNode(interface=fsl.MCFLIRT(),
@@ -93,14 +99,14 @@ class CBICQCWorkflow:
         datasink.inputs.parameterization = False
 
         # Connect up workflow
-        # self._wf.connect([
-        #     (imgsrc, moco, [('qc', 'in_file')]),
-        #     (moco, report, [('out_file', 'mcf')]),
-        #     (moco, tmean, [('out_file', 'in_file')]),
-        #     (tmean, report, [('out_file', 'tmean')]),
-        #     (report, datasink, [('report_pdf', 'reports.@report')]),
-        #     (tmean, datasink, [('out_file', 'resources.@tmean')])
-        #     ])
+        self._wf.connect([
+            (driver, moco, [('qc', 'in_file')]),
+            (moco, report, [('out_file', 'mcf')]),
+            (moco, tmean, [('out_file', 'in_file')]),
+            (tmean, report, [('out_file', 'tmean')]),
+            (report, datasink, [('report_pdf', 'reports.@report')]),
+            (tmean, datasink, [('out_file', 'resources.@tmean')])
+            ])
 
     def run(self, sge=False):
 

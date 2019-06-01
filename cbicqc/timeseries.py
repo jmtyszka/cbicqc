@@ -24,62 +24,94 @@ This file is part of CBICQC.
 Copyright 2019 California Institute of Technology.
 """
 
-import os
 import numpy as np
 import nibabel as nb
-import pandas as pd
+from scipy.optimize import least_squares
 
-def temporal_mean(qc_moco):
 
-    tmean = nb.Nifti1Image()
+def temporal_mean(qc_moco_nii):
 
-    return tmean
+    # Temporal mean of 4D timeseries
+    tmean = np.mean(qc_moco_nii.get_data(), axis=3)
 
-def extract_timeseries(qc_moco, roi_labels):
+    tmean_nii = nb.Nifti1Image(tmean, qc_moco_nii.affine)
 
-    return []
+    return tmean_nii
 
-# # Main function
-# def main():
-#
-#     # Load timeseries from QC directory
-#     print('    Loading timeseries')
-#     x = np.loadtxt(qc_ts_file)
-#
-#     # Parse timeseries into column vectors
-#     phantom_t = x[:, 0]
-#     nyquist_t = x[:, 1]
-#     noise_t = x[:, 2]
-#
-#     # Volume number vector
-#     nv = len(phantom_t)
-#     v = np.linspace(0, nv - 1, nv)
-#
-#     #
-#     # Fit detrending function
-#     #
-#
-#     # Demean timeseries
-#     phantom_mean = phantom_t.mean()
-#     nyquist_mean = nyquist_t.mean()
-#     noise_mean = noise_t.mean()
-#
-#     # Fit exp + linear model to demeaned timeseries
-#     print('    Fitting exponential models')
-#     phantom_opt, phantom_cov = curve_fit(explin, v, phantom_t - phantom_mean)
-#     nyquist_opt, nyquist_cov = curve_fit(explin, v, nyquist_t - nyquist_mean)
-#     noise_opt, noise_cov = curve_fit(explin, v, noise_t - noise_mean)
-#
-#     # Generate fitted curves
-#     phantom_fit = explin(v, phantom_opt[0], phantom_opt[1], phantom_opt[2]) + phantom_mean
-#     nyquist_fit = explin(v, nyquist_opt[0], nyquist_opt[1], nyquist_opt[2]) + nyquist_mean
-#     noise_fit = explin(v, noise_opt[0], noise_opt[1], noise_opt[2]) + noise_mean
-#
-#     # Fit residuals
-#     phantom_res = phantom_t - phantom_fit
-#     nyquist_res = nyquist_t - nyquist_fit
-#     noise_res = noise_t - noise_fit
-#
+
+def extract_timeseries(qc_moco_nii, rois_nii):
+
+    rois = rois_nii.get_data()
+    s = qc_moco_nii.get_data()
+
+    # Number of time points
+    nt = s.shape[3]
+
+    # Signal, Nyquist Ghost and Air label indices
+    labels = [1, 2, 3]
+    nl = len(labels)
+
+    s_mean_t = np.zeros([nl, nt])
+
+    for lc in range(0, nl):
+        mask = np.array(rois == labels[lc])
+        for tc in range(0, nt):
+            s_t = s[:, :, :, tc]
+            s_mean_t[lc, tc] = np.mean(s_t[mask])
+
+    return s_mean_t
+
+
+def detrend_timeseries(s_mean_t):
+
+    nl, nt = s_mean_t.shape
+
+    # Time vector
+    t = np.arange(0, nt)
+
+    s_detrend_t = np.zeros_like(s_mean_t)
+
+    fit_results = []
+
+    for lc in range(0, nl):
+
+        s_l = s_mean_t[lc, :]
+
+        s_l_rng, s_l_mean = np.max(s_l) - np.min(s_l), np.mean(s_l)
+
+        s_l_demean = s_l - s_l_mean
+
+        x0 = [s_l_rng, 3, s_l_rng / nt]
+
+        # Robust non-linear curve fit (Huber loss function)
+        result = least_squares(explin, x0, loss='huber', args=(t, s_l_demean))
+
+        # Fitted curve
+        s_fit = explin(result.x, t, 0)
+
+        # Detrend original timeseries
+        s_detrend_t[lc, :] = s_l - s_fit
+
+        fit_results.append(result)
+
+    return fit_results, s_detrend_t
+
+
+def explin(x, t, y):
+    """
+    Exponential + linear trend model
+
+    :param x: list, parameters
+        0: Exponential amplitude
+        1: Exponential time constant
+        2: Linear slope
+    :param t: array, time vector
+    :param y: array, data
+    :return: array, residuals
+    """
+
+    return x[0] * np.exp(-t / x[1]) + x[2] * t - y
+
 #     # Residual Gaussian sigma estimation
 #     # Assumes Gaussian white noise + sparse outlier spikes
 #     # Use robust estimate of residual sd (MAD * 1.4826)
@@ -125,22 +157,6 @@ def extract_timeseries(qc_moco, roi_labels):
 #     stats_pars = np.row_stack([phantom_opt, nyquist_opt, noise_opt])
 #
 #     #
-#     # Center of Mass
-#     #
-#
-#     # Calculate center of mass of temporal mean image using fslstats -c
-#     print('    Calculating center of mass of phantom')
-#     com_cmd = ["fslstats", os.path.join(qc_dir, "qc_mean"), "-c"]
-#     proc = subprocess.Popen(com_cmd, stdout=subprocess.PIPE)
-#     out, err = proc.communicate()
-#
-#     # Split returned string and convert to floats
-#     com_x, com_y, com_z = out.split()
-#     com_x = float(com_x)
-#     com_y = float(com_y)
-#     com_z = float(com_z)
-#
-#     #
 #     # Apparent motion parameters
 #     #
 #     print('    Analyzing motion parameters')
@@ -166,28 +182,7 @@ def extract_timeseries(qc_moco, roi_labels):
 #     #
 #     # Finalize stats array for writing
 #     #
-#
-#     # Flatten stats array (phantom pars first, then nyquist, etc)
-#     stats_pars = stats_pars.flatten()
-#
-#     # Add remaining stats to bottom of array
-#     stats_pars = np.append(stats_pars, [phantom_snr, nyquist_snr, com_x, com_y, com_z, max_adx, max_ady, max_adz])
-#
-#     #
-#     # Output results to files
-#     #
-#
-#     # Save fit parameters
-#     qc_stats_parfile = os.path.join(qc_dir, 'qc_stats.txt')
-#     np.savetxt(qc_stats_parfile, stats_pars, delimiter=' ', fmt='%0.6f')
-#
-#     # Save detrended timeseries
-#     print('    Writing detrended timeseries')
-#     ts_detrend_file = os.path.join(qc_dir, 'qc_timeseries_detrend.txt')
-#     np.savetxt(ts_detrend_file, ts_detrend, delimiter=' ', fmt='%0.6f')
 
 
 
-def explin(t, a, tau, b):
-    # Exponential + linear detrending model
-    return a * np.exp(-t / tau) + b * t
+

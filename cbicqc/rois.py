@@ -39,10 +39,12 @@ from scipy.ndimage.morphology import (binary_dilation,
                                       iterate_structure)
 
 
-def roi_labels(tmean):
+def roi_labels(tmean_nii):
 
     # Threshold method - possible future argument
     threshold_method = 'percentile'
+
+    tmean = tmean_nii.get_data()
 
     # Grab mean image dimensions
     nx, ny, nz = tmean.shape
@@ -58,28 +60,30 @@ def roi_labels(tmean):
     # Main signal mask
     signal_mask = tmean > th
 
-    # Construct 3D binary sphere structuring element, radius 5 voxels
-    k0 = generate_binary_structure(3, 2)
-    k = iterate_structure(k0, 5)
+    # Construct 3D binary sphere structuring element
+    k = generate_binary_structure(3, 2)  # 3D, 2-connected
+    k = iterate_structure(k, iterations=3)
 
-    # Erode signal mask once, then dilate twice
+    # Erode signal mask once, then dilate twice (open + dilate)
     signal_mask_ero = binary_erosion(signal_mask, structure=k, iterations=1)
     signal_mask_dil = binary_dilation(signal_mask_ero, structure=k, iterations=2)
 
-    # Create Nyquist mask by rolling dilated signal mask by FOVy/2
-    nyquist_mask = np.roll(signal_mask_dil, (0, int(ny / 2), 0))
+    # Create Nyquist mask by rolling eroded signal mask by FOVy/2
+    nyquist_mask = np.roll(signal_mask_ero, (0, int(ny / 2), 0))
 
-    # Remove overlap from Nyquist ghost mask by XORing with dilated signal mask
-    xor_mask = np.logical_xor(nyquist_mask, signal_mask_dil)
+    # Exclusive Nyquist ghost mask (remove overlap with dilated signal mask)
+    nyquist_only_mask = np.logical_and(nyquist_mask, np.logical_not(np.logical_and(nyquist_mask, signal_mask_dil)))
 
     # Create air mask
-    air_mask = 1 - signal_mask_dil - xor_mask
+    air_mask = 1 - signal_mask_dil - nyquist_only_mask
 
     # Finally merge all masks into an ROI label file
     # Undefined       = 0
     # Signal          = 1
     # Nyquist Ghost   = 2
     # Air Space       = 3
-    rois = signal_mask + 2 * nyquist_mask + 3 * air_mask
+    rois = np.uint8(signal_mask_ero + 2 * nyquist_only_mask + 3 * air_mask)
 
-    return rois
+    rois_nii = nb.Nifti1Image(rois, tmean_nii.affine)
+
+    return rois_nii

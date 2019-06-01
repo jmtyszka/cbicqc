@@ -75,8 +75,8 @@ def main():
     qc = CBICQC(in_file, work_dir)
     qc_results = qc.run()
 
-    print(qc_results['ROILabels'])
-    print(qc_results['ReportPDF'])
+    print('')
+    print('Test complete')
 
     # Clean exit
     sys.exit(0)
