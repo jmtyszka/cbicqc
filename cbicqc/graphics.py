@@ -24,11 +24,7 @@ This file is part of CBICQC.
 Copyright 2019 California Institute of Technology.
 """
 
-import os
 import numpy as np
-import nibabel as nb
-import pandas as pd
-from scipy.optimize import least_squares
 import matplotlib.pyplot as plt
 
 
@@ -39,7 +35,7 @@ def plot_roi_timeseries(s_mean_t, s_detrend_t, fit_results):
 
     t = np.arange(0, nt)
 
-    fig, axs = plt.subplots(3, 1)
+    fig, axs = plt.subplots(3, 1, figsize=(6, 6))
 
     for lc in range(0, 3):
 
@@ -47,8 +43,9 @@ def plot_roi_timeseries(s_mean_t, s_detrend_t, fit_results):
         plt.plot(t, s_mean_t[lc, :], t, s_detrend_t[lc, :])
         plt.title(roi_names[lc], loc='left')
 
-    plt.show()
-
+    # Save figure to PNG
+    plt.tight_layout()
+    plt.savefig('roi_timeseries.png', dpi=300)
 
 
 

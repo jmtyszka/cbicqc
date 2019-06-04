@@ -61,8 +61,8 @@ def roi_labels(tmean_nii):
     signal_mask = tmean > th
 
     # Construct 3D binary sphere structuring element
-    k = generate_binary_structure(3, 2)  # 3D, 2-connected
-    k = iterate_structure(k, iterations=3)
+    k = generate_binary_structure(3, 1)  # 3D, 1-connected
+    # k = iterate_structure(k, iterations=1)
 
     # Erode signal mask once, then dilate twice (open + dilate)
     signal_mask_ero = binary_erosion(signal_mask, structure=k, iterations=1)

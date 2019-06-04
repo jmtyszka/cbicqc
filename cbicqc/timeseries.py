@@ -25,8 +25,9 @@ Copyright 2019 California Institute of Technology.
 """
 
 import numpy as np
-import nibabel as nb
 from scipy.optimize import least_squares
+from scipy.signal import medfilt
+import nibabel as nb
 
 
 def temporal_mean(qc_moco_nii):
@@ -63,6 +64,10 @@ def extract_timeseries(qc_moco_nii, rois_nii):
 
 
 def detrend_timeseries(s_mean_t):
+    """
+    :param s_mean_t: spatial mean ROI timeseries
+    :return:
+    """
 
     nl, nt = s_mean_t.shape
 
@@ -75,24 +80,31 @@ def detrend_timeseries(s_mean_t):
 
     for lc in range(0, nl):
 
-        s_l = s_mean_t[lc, :]
+        s = s_mean_t[lc, :]
 
-        s_l_rng, s_l_mean = np.max(s_l) - np.min(s_l), np.mean(s_l)
+        s_min, s_max, s_mean = np.min(s), np.max(s), np.mean(s)
+        s_rng = s_max - s_min
 
-        s_l_demean = s_l - s_l_mean
-
-        x0 = [s_l_rng, 3, s_l_rng / nt]
+        x0 = [s_rng, 5, -s_rng / nt, s_mean]
+        bounds = ([0,      0, -np.inf,      0],
+                  [s_rng, nt,       0, np.inf])
 
         # Robust non-linear curve fit (Huber loss function)
-        result = least_squares(explin, x0, loss='huber', args=(t, s_l_demean))
+        result = least_squares(explin, x0,
+                               method='trf',
+                               loss='huber',
+                               bounds=bounds,
+                               args=(t, s))
 
         # Fitted curve
         s_fit = explin(result.x, t, 0)
 
         # Detrend original timeseries
-        s_detrend_t[lc, :] = s_l - s_fit
+        s_detrend_t[lc, :] = s - s_fit + s_mean
 
         fit_results.append(result)
+
+    # Extract signal-to-nyquist ratio, SNR, drift rate, warmup amplitude and time-constant
 
     return fit_results, s_detrend_t
 
@@ -105,12 +117,13 @@ def explin(x, t, y):
         0: Exponential amplitude
         1: Exponential time constant
         2: Linear slope
+        3: Offset
     :param t: array, time vector
     :param y: array, data
     :return: array, residuals
     """
 
-    return x[0] * np.exp(-t / x[1]) + x[2] * t - y
+    return x[0] * np.exp(-t / x[1]) + x[2] * t + x[3] - y
 
 #     # Residual Gaussian sigma estimation
 #     # Assumes Gaussian white noise + sparse outlier spikes

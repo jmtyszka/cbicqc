@@ -38,10 +38,11 @@ import os
 import sys
 import numpy as np
 import nibabel as nb
-from cbicqc.timeseries import temporal_mean, extract_timeseries, detrend_timeseries
-from cbicqc.graphics import plot_roi_timeseries
-from cbicqc.rois import roi_labels
-from cbicqc.report import PDFReport
+
+from .timeseries import temporal_mean, extract_timeseries, detrend_timeseries
+from .graphics import plot_roi_timeseries
+from .rois import roi_labels
+from .report import PDFReport
 
 
 class CBICQC:
@@ -95,6 +96,7 @@ class CBICQC:
 
         results['TMean'] = tmean_fname
         results['ROILabels'] = rois_fname
+        results['ROIGraphs'] = roi_graphs
         results['ReportPDF'] = pdf_report.filename
 
         return results

@@ -40,7 +40,7 @@ import os
 from bids import BIDSLayout
 
 import nipype.pipeline.engine as pe
-from nipype.interfaces.io import DataSink
+from nipype.interfaces.io import DataSink, BIDSDataGrabber
 from nipype.interfaces import fsl, IdentityInterface
 
 from .interfaces import CBICQCInterface
@@ -62,9 +62,9 @@ class CBICQCWorkflow:
         # Extract lists from BIDS layout
         subject_list = self._layout.get_subjects()
         session_list = self._layout.get_sessions()
-        qc_list = self._layout.get(return_type='file',
-                                   suffix='T2star',
-                                   extension=['.nii', '.nii.gz'])
+        qcs = self._layout.get(suffix='T2star',
+                               extensions=['nii', 'nii.gz'],
+                               return_type='file')
 
         # Main workflow
         self._wf = pe.Workflow(name='cbicqc')
@@ -74,12 +74,22 @@ class CBICQCWorkflow:
         # for approach to loading BIDS image and metadata
 
         # Setup driving iterator node
-        driver = pe.Node(interface=IdentityInterface(fields=['subject', 'session']),
+        # driver = pe.Node(interface=IdentityInterface(fields=['qc_T2star']),
+        #                  name='driver')
+        # driver.iterables = [('qc_T2star', qc_list)]
+
+        # BIDS data grabber
+        driver = pe.Node(interface=BIDSDataGrabber(infields=['subject', 'session']),
                          name='driver')
+        driver.inputs.base_dir = self._bids_dir
+        driver.inputs.output_query = {
+            'qcs': dict(suffix='T2star',
+                        extensions=['nii', 'nii.gz'])}
         driver.iterables = [('subject', subject_list),
                             ('session', session_list)]
 
         # Motion correction - FSL MCFLIRT
+        # TODO: register to mean image
         moco = pe.MapNode(interface=fsl.MCFLIRT(),
                           name='moco',
                           iterfield=['in_file'])
@@ -88,9 +98,9 @@ class CBICQCWorkflow:
         moco.inputs.save_plots = True
 
         # Quality analysis
-        quality = pe.MapNode(interface=CBICQCInterface(infields=['subject', 'session']))
-        quality.subject = []
-        quality.session = []
+        qc = pe.MapNode(interface=CBICQCInterface(),
+                        name='qc',
+                        iterfield=['mcf'])
 
         # Save QC analysis results in <bids_root>/derivatives/cbicqc
         datasink = pe.Node(interface=DataSink(), name='datasink')
@@ -100,12 +110,9 @@ class CBICQCWorkflow:
 
         # Connect up workflow
         self._wf.connect([
-            (driver, moco, [('qc', 'in_file')]),
-            (moco, report, [('out_file', 'mcf')]),
-            (moco, tmean, [('out_file', 'in_file')]),
-            (tmean, report, [('out_file', 'tmean')]),
-            (report, datasink, [('report_pdf', 'reports.@report')]),
-            (tmean, datasink, [('out_file', 'resources.@tmean')])
+            (driver, moco, [('qcs', 'in_file')]),
+            (moco, qc, [('out_file', 'mcf')]),
+            (qc, datasink, [('report_pdf', 'reports.@report')]),
             ])
 
     def run(self, sge=False):

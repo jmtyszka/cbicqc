@@ -46,7 +46,7 @@ import sys
 import argparse
 import pkg_resources
 
-from .workflow import CBICQCWorkflow
+from cbicqc.workflow import CBICQCWorkflow
 
 
 def main():
