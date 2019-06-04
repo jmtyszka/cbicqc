@@ -24,18 +24,20 @@ This file is part of CBICQC.
 Copyright 2019 California Institute of Technology.
 """
 
+import os
 import numpy as np
 import matplotlib.pyplot as plt
+from skimage.util import montage
 
 
-def plot_roi_timeseries(s_mean_t, s_detrend_t, fit_results):
+def plot_roi_timeseries(s_mean_t, s_detrend_t, plot_fname):
 
     nt = s_mean_t.shape[1]
     roi_names = ['Phantom', 'Nyquist Ghost', 'Air']
 
     t = np.arange(0, nt)
 
-    fig, axs = plt.subplots(3, 1, figsize=(6, 6))
+    plt.subplots(3, 1, figsize=(10, 5))
 
     for lc in range(0, 3):
 
@@ -43,9 +45,55 @@ def plot_roi_timeseries(s_mean_t, s_detrend_t, fit_results):
         plt.plot(t, s_mean_t[lc, :], t, s_detrend_t[lc, :])
         plt.title(roi_names[lc], loc='left')
 
-    # Save figure to PNG
+    # Space subplots without title overlap
     plt.tight_layout()
-    plt.savefig('roi_timeseries.png', dpi=300)
+
+    # Save plot to file
+    plt.savefig(plot_fname, dpi=300)
+
+    return plot_fname
+
+
+def orthoslice_montage(img_nii, montage_fname):
+
+    orient_name = ['Axial', 'Coronal', 'Sagittal']
+
+    img3d = img_nii.get_data()
+
+    plt.subplots(1, 3, figsize=(7, 2.4))
+
+    for ax in [0, 1, 2]:
+
+        # Transpose dimensions for given orientation
+        ax_order = np.roll([2, 0, 1], ax)
+        s = np.transpose(img3d, ax_order)
+
+        # Downsample to 9 images in first dimension
+        nx = s.shape[0]
+        xx = np.linspace(0, nx-1, 9).astype(int)
+        s = s[xx, :, :]
+
+        m2d = montage(s, fill='mean', grid_shape=(3, 3))
+
+        plt.subplot(1, 3, ax+1)
+        plt.imshow(m2d,
+                   cmap=plt.get_cmap('viridis'),
+                   aspect='equal',
+                   origin='lower')
+        plt.title(orient_name[ax])
+
+        plt.axis('off')
+        plt.subplots_adjust(bottom=0.0, top=0.9, left=0.0, right=1.0)
+
+    # Space subplots without title overlap
+    # plt.tight_layout()
+
+    # Save plot to file
+    plt.savefig(montage_fname, dpi=300)
+
+    return montage_fname
+
+
 
 
 

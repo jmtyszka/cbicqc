@@ -38,8 +38,10 @@ SOFTWARE.
 """
 
 import os
+import io
 import datetime as dt
 
+from reportlab.lib import colors
 from reportlab.lib.enums import TA_JUSTIFY
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import (SimpleDocTemplate,
@@ -53,12 +55,14 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 
 
-class PDFReport:
+class ReportPDF:
 
-    def __init__(self, work_dir):
+    def __init__(self, fnames):
 
-        self.filename = os.path.join(work_dir, 'cbicqc_report.pdf')
+        # Output filename
+        self._fnames = fnames
 
+        # Contents - list of flowables to be built into a document
         self._contents = []
 
         # Add a justified paragraph style
@@ -67,6 +71,7 @@ class PDFReport:
 
         self._init_pdf()
         self._add_summary()
+        self._add_graphs()
         self._add_slices()
 
         self._doc.build(self._contents)
@@ -74,12 +79,12 @@ class PDFReport:
     def _init_pdf(self):
 
         # Create a new PDF document
-        self._doc = SimpleDocTemplate(self.filename,
+        self._doc = SimpleDocTemplate(self._fnames['ReportPDF'],
                                       pagesize=letter,
                                       rightMargin=0.5 * inch,
                                       leftMargin=0.5 * inch,
-                                      topMargin=1.0 * inch,
-                                      bottomMargin=1.0 * inch)
+                                      topMargin=0.5 * inch,
+                                      bottomMargin=0.5 * inch)
 
     def _add_summary(self):
 
@@ -96,9 +101,9 @@ class PDFReport:
         # Session information
         #
 
-        ptext = '<font size=12>Session Information</font>'
+        ptext = '<font size=14><b>Session Information</b></font>'
         self._contents.append(Paragraph(ptext, self._pstyles['Justify']))
-        self._contents.append(Spacer(1, 0.25 * inch))
+        self._contents.append(Spacer(1, 0.1 * inch))
 
         info = [['Subject', 'QC'],
                 ['Session', '20180531'],
@@ -117,9 +122,9 @@ class PDFReport:
         # QC metrics
         #
 
-        ptext = '<font size=12>Quality Metrics</font>'
+        ptext = '<font size=14><b>Quality Metrics</b></font>'
         self._contents.append(Paragraph(ptext, self._pstyles['Justify']))
-        self._contents.append(Spacer(1, 0.25 * inch))
+        self._contents.append(Spacer(1, 0.1 * inch))
 
         qc_metrics = [['Phantom Temporal SNR', '100.0'],
                       ['Nyquist Temporal SNR', '20.0']]
@@ -129,13 +134,99 @@ class PDFReport:
         self._contents.append(qc_table)
         self._contents.append(Spacer(1, 0.25 * inch))
 
+    def _add_graphs(self):
+
+        # Page break
+        self._contents.append(PageBreak())
+
+        #
+        # ROI Spatial Mean Timeseries
+        #
+
+        ptext = '<font size=14><b>ROI Spatial Mean Timeseries</b></font>'
+        self._contents.append(Paragraph(ptext, self._pstyles['Justify']))
+        self._contents.append(Spacer(1, 0.25 * inch))
+
+        ptext = """
+        <font size=11>
+        These three graphs show the spatial mean signal intensity within the phantom, Nyquist ghost and air
+        space regions of interest (ROIs). The blue line is the raw spatial mean intensity and the orange line
+        has been detrended with an exponential + linear model. 
+        </font>
+        """
+        self._contents.append(Paragraph(ptext, self._pstyles['Justify']))
+        self._contents.append(Spacer(1, 0.1 * inch))
+
+        roi_ts_img = Image(self._fnames['ROITimeseries'], 7.0 * inch, 3.5 * inch, hAlign='LEFT')
+        self._contents.append(roi_ts_img)
+
+        self._contents.append(Spacer(1, 0.5 * inch))
+
+        #
+        # Motion Parameter Timeseries
+        #
+
+        ptext = '<font size=14><b>Motion Parameter Timeseries</b></font>'
+        self._contents.append(Paragraph(ptext, self._pstyles['Justify']))
+        self._contents.append(Spacer(1, 0.25 * inch))
+
+        ptext = """
+        <font size=11>
+        These three graphs show the evolution over time of displacement and rotation parameters required
+        to register the phantom image at a given time to the mean phantom image over the entire series. 
+        </font>
+        """
+        self._contents.append(Paragraph(ptext, self._pstyles['Justify']))
+        self._contents.append(Spacer(1, 0.1 * inch))
+
+        roi_ts_img = Image(self._fnames['ROITimeseries'], 7.0 * inch, 3.5 * inch, hAlign='LEFT')
+        self._contents.append(roi_ts_img)
+
     def _add_slices(self):
 
         # Page break
         self._contents.append(PageBreak())
 
-        ptext = '<font size=12>Temporal Mean Image</font>'
+        #
+        # Temporal Mean Image
+        #
+
+        ptext = '<font size=14><b>Temporal Mean Image</b></font>'
         self._contents.append(Paragraph(ptext, self._pstyles['Justify']))
         self._contents.append(Spacer(1, 0.25 * inch))
+
+        ptext = """
+        <font size=11>
+        Axial, coronal and sagittal sections through the temporal mean image
+        following motion correction. 
+        </font>
+        """
+        self._contents.append(Paragraph(ptext, self._pstyles['Justify']))
+        self._contents.append(Spacer(1, 0.1 * inch))
+
+        tmean_montage_img = Image(self._fnames['TMeanMontage'], 7.0 * inch, 2.4 * inch, hAlign='LEFT')
+        self._contents.append(tmean_montage_img)
+
+        self._contents.append(Spacer(1, 0.5 * inch))
+
+        #
+        # Temporal SD Image
+        #
+
+        ptext = '<font size=14><b>Temporal SD Image</b></font>'
+        self._contents.append(Paragraph(ptext, self._pstyles['Justify']))
+        self._contents.append(Spacer(1, 0.25 * inch))
+
+        ptext = """
+        <font size=11>
+        Axial, coronal and sagittal sections through the temporal standard deviation image
+        following motion correction. 
+        </font>
+        """
+        self._contents.append(Paragraph(ptext, self._pstyles['Justify']))
+        self._contents.append(Spacer(1, 0.1 * inch))
+
+        tsd_montage_img = Image(self._fnames['TSDMontage'], 7.0 * inch, 2.4 * inch, hAlign='LEFT')
+        self._contents.append(tsd_montage_img)
 
 

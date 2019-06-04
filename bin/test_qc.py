@@ -72,11 +72,11 @@ def main():
     print('Version : {}'.format(ver))
     print('')
 
-    qc = CBICQC(in_file, work_dir)
-    qc_results = qc.run()
+    qc = CBICQC(in_file)
+    fnames = qc.run()
 
-    print('')
-    print('Test complete')
+    # Open report PDF
+    os.system('open {}'.format(fnames['ReportPDF']))
 
     # Clean exit
     sys.exit(0)

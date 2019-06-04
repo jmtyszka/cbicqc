@@ -47,6 +47,10 @@ class CBICQCInterfaceInputSpec(BaseInterfaceInputSpec):
                mandatory=True,
                desc='Motion corrected 4D timeseries')
 
+    par_file = File(exists=True,
+                    mandatory=True,
+                    desc='Motion parameter timeseries')
+
 
 class CBICQCInterfaceOutputSpec(TraitedSpec):
 
@@ -60,8 +64,7 @@ class CBICQCInterface(BaseInterface):
 
     def _run_interface(self, runtime):
 
-        qc = CBICQC(self.inputs.mcf, '/Users/jmt/sandbox/cbicqc')
-
+        qc = CBICQC(self.inputs.mcf, self.inputs.par_file)
         qc_results = qc.run()
 
         self._pdf_fname = qc_results['ReportPDF']

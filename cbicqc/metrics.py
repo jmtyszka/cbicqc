@@ -1,10 +1,10 @@
 # !/usr/bin/env python
 """
-CBICQC timeseries analysis node
+CBICQC quality metrics
 
 AUTHOR : Mike Tyszka
 PLACE  : Caltech
-DATES  : 2019-05-22 JMT From scratch
+DATES  : 2019-06-04 JMT From scratch
 
 This file is part of CBICQC.
 
@@ -29,103 +29,7 @@ from scipy.optimize import least_squares
 from scipy.signal import medfilt
 import nibabel as nb
 
-
-def temporal_mean_sd(qc_moco_nii):
-
-    # Temporal mean of 4D timeseries
-    tmean = np.mean(qc_moco_nii.get_data(), axis=3)
-    tsd = np.std(qc_moco_nii.get_data(), axis=3)
-
-    tmean_nii = nb.Nifti1Image(tmean, qc_moco_nii.affine)
-    tsd_nii = nb.Nifti1Image(tsd, qc_moco_nii.affine)
-
-    return tmean_nii, tsd_nii
-
-
-def extract_timeseries(qc_moco_nii, rois_nii):
-
-    rois = rois_nii.get_data()
-    s = qc_moco_nii.get_data()
-
-    # Number of time points
-    nt = s.shape[3]
-
-    # Signal, Nyquist Ghost and Air label indices
-    labels = [1, 2, 3]
-    nl = len(labels)
-
-    s_mean_t = np.zeros([nl, nt])
-
-    for lc in range(0, nl):
-        mask = np.array(rois == labels[lc])
-        for tc in range(0, nt):
-            s_t = s[:, :, :, tc]
-            s_mean_t[lc, tc] = np.mean(s_t[mask])
-
-    return s_mean_t
-
-
-def detrend_timeseries(s_mean_t):
-    """
-    :param s_mean_t: spatial mean ROI timeseries
-    :return:
-    """
-
-    nl, nt = s_mean_t.shape
-
-    # Time vector
-    t = np.arange(0, nt)
-
-    s_detrend_t = np.zeros_like(s_mean_t)
-
-    fit_results = []
-
-    for lc in range(0, nl):
-
-        s = s_mean_t[lc, :]
-
-        s_min, s_max, s_mean = np.min(s), np.max(s), np.mean(s)
-        s_rng = s_max - s_min
-
-        x0 = [s_rng, 5, -s_rng / nt, s_mean]
-        bounds = ([0,      0, -np.inf,      0],
-                  [s_rng, nt,       0, np.inf])
-
-        # Robust non-linear curve fit (Huber loss function)
-        result = least_squares(explin, x0,
-                               method='trf',
-                               loss='huber',
-                               bounds=bounds,
-                               args=(t, s))
-
-        # Fitted curve
-        s_fit = explin(result.x, t, 0)
-
-        # Detrend original timeseries
-        s_detrend_t[lc, :] = s - s_fit + s_mean
-
-        fit_results.append(result)
-
-    # Extract signal-to-nyquist ratio, SNR, drift rate, warmup amplitude and time-constant
-
-    return fit_results, s_detrend_t
-
-
-def explin(x, t, y):
-    """
-    Exponential + linear trend model
-
-    :param x: list, parameters
-        0: Exponential amplitude
-        1: Exponential time constant
-        2: Linear slope
-        3: Offset
-    :param t: array, time vector
-    :param y: array, data
-    :return: array, residuals
-    """
-
-    return x[0] * np.exp(-t / x[1]) + x[2] * t + x[3] - y
+def metrics():
 
 #     # Residual Gaussian sigma estimation
 #     # Assumes Gaussian white noise + sparse outlier spikes
@@ -193,10 +97,10 @@ def explin(x, t, y):
 #     max_adx = (np.abs(dx)).max() * 1000.0
 #     max_ady = (np.abs(dy)).max() * 1000.0
 #     max_adz = (np.abs(dz)).max() * 1000.0
-#
-#     #
-#     # Finalize stats array for writing
-#     #
+
+    metrics = dict()
+
+    return metrics
 
 
 

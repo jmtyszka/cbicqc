@@ -36,36 +36,44 @@ SOFTWARE.
 
 import os
 import sys
+import tempfile
 import numpy as np
 import nibabel as nb
 
-from .timeseries import temporal_mean, extract_timeseries, detrend_timeseries
-from .graphics import plot_roi_timeseries
+from .timeseries import temporal_mean_sd, extract_timeseries, detrend_timeseries
+from .graphics import plot_roi_timeseries, orthoslice_montage
 from .rois import roi_labels
-from .report import PDFReport
+from .report import ReportPDF
 
 
 class CBICQC:
 
-    def __init__(self, qc_mcf, work_dir):
+    def __init__(self, qc_mcf):
 
         self._qc_mcf = qc_mcf
-        self._work_dir = work_dir
+
+        # Derive moco pars filename from mcf image filename
+        self._qc_mopars_fname = qc_mcf.replace('.nii.gz', '.par')
+
+        self._work_dir = tempfile.mkdtemp()
+        self._report_fname = os.path.join(self._work_dir, 'report.pdf')
+
+        print('Report PDF : {}'.format(self._report_fname))
 
     def run(self):
 
         print('Starting QC analysis')
 
-        # Setup a dictionary for returned results
-        results = dict()
-
         # Load 4D motion corrected QC phantom image
         print('  Loading motion corrected QC timeseries image')
         qc_moco_nii = nb.load(self._qc_mcf)
 
+        print('  Loading motion parameter timeseries')
+        qc_mopars = np.genfromtxt(self._qc_mopars_fname)
+
         # Temporal mean and sd images
         print('  Calculating temporal mean image')
-        tmean_nii = temporal_mean(qc_moco_nii)
+        tmean_nii, tsd_nii = temporal_mean_sd(qc_moco_nii)
 
         # Create ROI labels
         print('  Constructing ROI labels')
@@ -80,26 +88,41 @@ class CBICQC:
         fit_results, s_detrend_t = detrend_timeseries(s_mean_t)
 
         # Plot ROI time series graphs
-        roi_graphs = plot_roi_timeseries(s_mean_t, s_detrend_t, fit_results)
+        roi_ts_fname = os.path.join(self._work_dir, 'roi_timeseries.png')
+        plot_roi_timeseries(s_mean_t, s_detrend_t, roi_ts_fname)
+
+        # Create mean image orthoslices
+        tmean_montage_fname = os.path.join(self._work_dir, 'tmean_montage.png')
+        orthoslice_montage(tmean_nii, tmean_montage_fname)
+
+        # Create sd image orthoslices
+        tsd_montage_fname = os.path.join(self._work_dir, 'tsd_montage.png')
+        orthoslice_montage(tsd_nii, tsd_montage_fname)
 
         # Save all intermediate images
         print('  Saving temporal mean image')
-        tmean_fname = 'tmean.nii.gz'
+        tmean_fname = os.path.join(self._work_dir, 'tmean.nii.gz')
         nb.save(tmean_nii, tmean_fname)
 
+        print('  Saving temporal sd image')
+        tsd_fname = os.path.join(self._work_dir, 'tsd.nii.gz')
+        nb.save(tsd_nii, tsd_fname)
+
         print('  Saving ROI labels')
-        rois_fname = 'roi_labels.nii.gz'
-        nb.save(rois_nii, rois_fname)
+        roi_labels_fname = os.path.join(self._work_dir, 'roi_labels.nii.gz')
+        nb.save(rois_nii, roi_labels_fname)
+
+        # Construct filename dictionary to pass to PDF generator
+        fnames = dict(TempDir=self._work_dir,
+                      ReportPDF=self._report_fname,
+                      ROITimeseries=roi_ts_fname,
+                      TMeanMontage=tmean_montage_fname,
+                      TSDMontage=tsd_montage_fname,
+                      TMean=tmean_fname,
+                      TSD=tsd_fname,
+                      ROILabels = roi_labels_fname)
 
         # Generate and save PDF report
-        pdf_report = PDFReport(self._work_dir)
+        ReportPDF(fnames)
 
-        results['TMean'] = tmean_fname
-        results['ROILabels'] = rois_fname
-        results['ROIGraphs'] = roi_graphs
-        results['ReportPDF'] = pdf_report.filename
-
-        return results
-
-
-
+        return fnames

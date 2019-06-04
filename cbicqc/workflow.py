@@ -94,7 +94,7 @@ class CBICQCWorkflow:
                           name='moco',
                           iterfield=['in_file'])
         moco.inputs.cost = 'corratio'
-        moco.inputs.save_mats = True
+        moco.inputs.mean_vol = True
         moco.inputs.save_plots = True
 
         # Quality analysis
@@ -111,7 +111,8 @@ class CBICQCWorkflow:
         # Connect up workflow
         self._wf.connect([
             (driver, moco, [('qcs', 'in_file')]),
-            (moco, qc, [('out_file', 'mcf')]),
+            (moco, qc, [('out_file', 'mcf'),
+                        ('par_file', 'par_file')]),
             (qc, datasink, [('report_pdf', 'reports.@report')]),
             ])
 
