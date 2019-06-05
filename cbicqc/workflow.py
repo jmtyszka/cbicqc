@@ -112,7 +112,7 @@ class CBICQCWorkflow:
         self._wf.connect([
             (driver, moco, [('qcs', 'in_file')]),
             (moco, qc, [('out_file', 'mcf'),
-                        ('par_file', 'par_file')]),
+                        ('mopars', 'mopars')]),
             (qc, datasink, [('report_pdf', 'reports.@report')]),
             ])
 

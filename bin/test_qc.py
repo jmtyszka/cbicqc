@@ -58,8 +58,11 @@ def main():
 
     # Parse command line arguments
     args = parser.parse_args()
-    in_file = os.path.realpath(args.infile)
-    work_dir = os.path.realpath(args.work)
+    mcf_fname = os.path.realpath(args.infile)
+    mopars_fname = mcf_fname.replace('.nii.gz', '.par')
+
+    # Place report in same directory as mcf image
+    report_fname = os.path.join(os.path.dirname(mcf_fname), 'report.pdf')
 
     # Read version from setup.py
     ver = pkg_resources.get_distribution('cbicqc').version
@@ -72,7 +75,7 @@ def main():
     print('Version : {}'.format(ver))
     print('')
 
-    qc = CBICQC(in_file)
+    qc = CBICQC(mcf_fname, mopars_fname, report_fname)
     fnames = qc.run()
 
     # Open report PDF

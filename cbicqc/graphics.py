@@ -51,7 +51,39 @@ def plot_roi_timeseries(s_mean_t, s_detrend_t, plot_fname):
     # Save plot to file
     plt.savefig(plot_fname, dpi=300)
 
-    return plot_fname
+
+def plot_mopar_timeseries(mopars, plot_fname):
+    """
+    Plots x, y, z displacement and rotation timeseries from MCFLIRT registrations
+
+    mopars columns: (dx, dy, dz, rx, ry, rz)
+    Displacements in mm, rotations in degrees
+
+    :param mopars: float array, nt x 6 motion parameters
+    :param plot_fname: str, output plot filename
+    :return:
+    """
+
+    nt = mopars.shape[0]
+    t = np.arange(0, nt)
+
+    plt.subplots(2, 1, figsize=(10, 5))
+
+    plt.subplot(2, 1, 1)
+    plt.plot(t, mopars[:, 0:3] * 1e3)
+    plt.legend(['x', 'y', 'z'])
+    plt.title('Displacement (um)', loc='left')
+
+    plt.subplot(2, 1, 2)
+    plt.plot(t, mopars[:, 3:6] * 1e3)
+    plt.legend(['x', 'y', 'z'])
+    plt.title('Rotation (mdeg)', loc='left')
+
+    # Space subplots without title overlap
+    plt.tight_layout()
+
+    # Save plot to file
+    plt.savefig(plot_fname, dpi=300)
 
 
 def orthoslice_montage(img_nii, montage_fname):
