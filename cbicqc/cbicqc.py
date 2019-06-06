@@ -35,10 +35,14 @@ SOFTWARE.
 """
 
 import os
+import sys
 import json
 import tempfile
 import numpy as np
 import nibabel as nb
+import SimpleITK as sitk
+
+from bids import BIDSLayout
 
 from .timeseries import temporal_mean_sd, extract_timeseries, detrend_timeseries
 from .graphics import (plot_roi_timeseries,
@@ -50,22 +54,15 @@ from .report import ReportPDF
 
 class CBICQC:
 
-    def __init__(self, mcf_fname, mopars_fname, report_fname=None):
+    def __init__(self, bids_dir, subject, session):
 
-        self._mcf_fname = mcf_fname
-        self._subject, self._session = self._parse_filename(mcf_fname)
-        self._meta_fname = mcf_fname.replace('_mcf.nii.gz', '.json')
-        self._mopars_fname = mopars_fname
+        self._bids_dir = bids_dir
+        self._subject = subject
+        self._session = session
 
-        # Derive moco pars filename from mcf image filename
-        self._qc_mopars_fname = mcf_fname.replace('.nii.gz', '.par')
-
+        # Create safe temporary directory
         self._work_dir = tempfile.mkdtemp()
-
-        if report_fname:
-            self._report_fname = report_fname
-        else:
-            self._report_fname = os.path.join(self._work_dir, 'report.pdf')
+        self._report_fname = os.path.join(self._work_dir, 'report.pdf')
 
         # Intermediate filenames
         self._tmean_fname = os.path.join(self._work_dir, 'tmean.nii.gz')
@@ -77,34 +74,54 @@ class CBICQC:
 
     def run(self):
 
-        print('Starting QC analysis')
+        print('Starting CBIC QC analysis')
 
-        # Load 4D motion corrected QC phantom image
-        print('  Loading motion corrected QC timeseries image')
-        mcf_nii = nb.load(self._mcf_fname)
+        # Get BIDS layout
+        # Index BIDS directory
+        layout = BIDSLayout(self._bids_dir,
+                            absolute_paths=True,
+                            ignore=['work', 'derivatives', 'exclude'])
 
-        # Load JSON sidecar if available
+        # Get first QC image for this subject/session
+        img_list = layout.get(subject=self._subject,
+                              session=self._session,
+                              suffix='T2star',
+                              extensions=['nii', 'nii.gz'],
+                              return_type='file')
+        if not img_list:
+            print('* No QC images found for subject {} session {} - exiting'.
+                  format(self._subject, self._session))
+            sys.exit(1)
+
+        qc_img_fname = img_list[0]
+        qc_meta_fname = qc_img_fname.replace('.nii.gz', '.json')
+
+        # Load 4D QC phantom image
+        print('  Loading QC timeseries image')
+        qc_nii = nb.load(qc_img_fname)
+
+        # Load metadata if available
         print('  Loading QC metadata')
         try:
-            with open(self._meta_fname, 'r') as fd:
+            with open(qc_meta_fname, 'r') as fd:
                 meta = json.load(fd)
         except IOError:
-            print('* Could not open image metadata {}'.format(self._meta_fname))
+            print('* Could not open image metadata {}'.format(qc_meta_fname))
             print('* Using default imaging parameters')
             meta = self._default_metadata()
 
-        # Integrate addition meta data from Nifti header and filename
+        # Integrate additional meta data from Nifti header and filename
         meta['Subject'] = self._subject
         meta['Session'] = self._session
-        meta['VoxelSize'] = ' x '.join(str(x) for x in mcf_nii.header.get('pixdim')[1:4])
-        meta['MatrixSize'] = ' x '.join(str(x) for x in mcf_nii.shape)
+        meta['VoxelSize'] = ' x '.join(str(x) for x in qc_nii.header.get('pixdim')[1:4])
+        meta['MatrixSize'] = ' x '.join(str(x) for x in qc_nii.shape)
 
-        print('  Loading motion parameter timeseries')
-        mopars = np.genfromtxt(self._mopars_fname)
+        # Perform rigid body motion correction on QC series
+        qc_moco_nii, qc_moco_pars = self._moco(qc_nii)
 
         # Temporal mean and sd images
         print('  Calculating temporal mean image')
-        tmean_nii, tsd_nii = temporal_mean_sd(mcf_nii)
+        tmean_nii, tsd_nii = temporal_mean_sd(qc_moco_nii)
 
         # Create ROI labels
         print('  Constructing ROI labels')
@@ -112,7 +129,7 @@ class CBICQC:
 
         # Extract ROI time series
         print('  Extracting ROI time series')
-        s_mean_t = extract_timeseries(mcf_nii, rois_nii)
+        s_mean_t = extract_timeseries(qc_moco_nii, rois_nii)
 
         # Detrend time series
         print('  Detrending time series')
@@ -129,7 +146,7 @@ class CBICQC:
         plot_roi_timeseries(s_mean_t, s_detrend_t, roi_ts_fname)
 
         mopar_ts_fname = os.path.join(self._work_dir, 'mopar_timeseries.png')
-        plot_mopar_timeseries(mopars, mopar_ts_fname)
+        plot_mopar_timeseries(qc_moco_pars, mopar_ts_fname)
 
         #
         # Create orthoslice images
@@ -219,4 +236,72 @@ class CBICQC:
         metrics['WarmupTime'] = phantom_t_warm
 
         return metrics
+
+    def _moco(self, img_nii):
+
+        img = img_nii.get_data()
+        moco = np.zeros_like(img)
+
+        # Reference image
+        img_0 = img[:, :, :, 0]
+
+        # Loop over remaining images
+        for tc in range(1, img.shape[3]):
+
+            img_t = img[:, :, :, tc]
+
+            img_t_0, tx_pars = self._rigid_register(img_t, img_0)
+
+            moco[:, :, :, tc] = img_t_0
+
+        moco_nii = nb.Nifti1Image(moco, img_nii.affine)
+
+        moco_pars = np.zeros([img.shape[3], 6])
+
+        return moco_nii, moco_pars
+
+    def _rigid_register(self, img, ref):
+
+        fixed_image = sitk.GetImageFromArray(ref)
+        moving_image = sitk.GetImageFromArray(img)
+
+        initial_transform = sitk.CenteredTransformInitializer(fixed_image,
+                                                              moving_image,
+                                                              sitk.Euler3DTransform(),
+                                                              sitk.CenteredTransformInitializerFilter.GEOMETRY)
+
+        # Setup image registration
+        registration_method = sitk.ImageRegistrationMethod()
+
+        # Similarity metric settings.
+        registration_method.SetMetricAsMattesMutualInformation(numberOfHistogramBins=50)
+        registration_method.SetMetricSamplingStrategy(registration_method.RANDOM)
+        registration_method.SetMetricSamplingPercentage(0.01)
+
+        registration_method.SetInterpolator(sitk.sitkLinear)
+
+        # Optimizer settings.
+        registration_method.SetOptimizerAsGradientDescent(learningRate=1.0,
+                                                          numberOfIterations=100,
+                                                          convergenceMinimumValue=1e-6,
+                                                          convergenceWindowSize=10)
+
+        registration_method.SetOptimizerScalesFromPhysicalShift()
+
+        # Setup for the multi-resolution framework.
+        registration_method.SetShrinkFactorsPerLevel(shrinkFactors=[4, 2, 1])
+        registration_method.SetSmoothingSigmasPerLevel(smoothingSigmas=[2, 1, 0])
+        registration_method.SmoothingSigmasAreSpecifiedInPhysicalUnitsOn()
+
+        # Don't optimize in-place, we would possibly like to run this cell multiple times.
+        registration_method.SetInitialTransform(initial_transform, inPlace=False)
+
+        # Run registration
+        final_transform = registration_method.Execute(sitk.Cast(fixed_image, sitk.sitkFloat32),
+                                                      sitk.Cast(moving_image, sitk.sitkFloat32))
+
+        moving_resampled = sitk.Resample(moving_image, fixed_image, final_transform, sitk.sitkLinear, 0.0,
+                                         moving_image.GetPixelID())
+
+        return moving_resampled, final_transform
 

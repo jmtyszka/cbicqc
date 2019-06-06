@@ -46,19 +46,22 @@ import sys
 import argparse
 import pkg_resources
 
-from .workflow import CBICQCWorkflow
+from .cbicqc import CBICQC
 
 
 def main():
 
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Lightweight daily phantom QC analysis and reporting')
-    parser.add_argument('-d', '--qcdir', required=True, help='QC dataset directory (BIDS format)')
-    parser.add_argument('-sge', action='store_true', help='Submit QC workflow to Sun Grid Engine')
+    parser.add_argument('-dir', required=True, help='BIDS QC dataset directory')
+    parser.add_argument('-sub', required=True, help='Subject ID')
+    parser.add_argument('-ses', required=True, help='Session ID')
 
     # Parse command line arguments
     args = parser.parse_args()
-    bids_dir = os.path.realpath(args.qcdir)
+    bids_dir = os.path.realpath(args.dir)
+    subj_id = os.path.realpath(args.sub)
+    sess_id = os.path.realpath(args.ses)
 
     # Read version from setup.py
     ver = pkg_resources.get_distribution('cbicqc').version
@@ -66,15 +69,13 @@ def main():
     # Splash
     print('')
     print('-----------------------------')
-    print('CBIC Quality Control Pipeline')
+    print('CBIC Quality Control Analysis')
     print('-----------------------------')
     print('Version : {}'.format(ver))
     print('')
-
-    # Setup workflow for QC on all sessions in BIDS directory
-    print('Setting up workflow')
-    qc_wf = CBICQCWorkflow(bids_dir)
-    qc_wf.run(args.sge)
+    print('BIDS Directory : {}'.format(bids_dir))
+    print('Subject : {}'.format(subj_id))
+    print('Subject : {}'.format(sess_id))
 
     # Clean exit
     sys.exit(0)

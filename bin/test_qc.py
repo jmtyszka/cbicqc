@@ -52,34 +52,33 @@ from cbicqc.cbicqc import CBICQC
 def main():
 
     # Parse command line arguments
-    parser = argparse.ArgumentParser(description='QC workflow tests')
-    parser.add_argument('-i', '--infile', required=True, help='Motion corrected QC series')
-    parser.add_argument('-w', '--work', required=False, help='CBICQC working directory')
+    parser = argparse.ArgumentParser(description='Lightweight daily phantom QC analysis and reporting')
+    parser.add_argument('-dir', required=True, help='BIDS QC dataset directory')
+    parser.add_argument('-sub', required=True, help='Subject ID')
+    parser.add_argument('-ses', required=True, help='Session ID')
 
     # Parse command line arguments
     args = parser.parse_args()
-    mcf_fname = os.path.realpath(args.infile)
-    mopars_fname = mcf_fname.replace('.nii.gz', '.par')
-
-    # Place report in same directory as mcf image
-    report_fname = os.path.join(os.path.dirname(mcf_fname), 'report.pdf')
+    bids_dir = os.path.realpath(args.dir)
+    subj_id = args.sub
+    sess_id = args.ses
 
     # Read version from setup.py
     ver = pkg_resources.get_distribution('cbicqc').version
 
     # Splash
     print('')
-    print('----------------------')
-    print('CBIC QC Workflow Tests')
-    print('----------------------')
+    print('-----------------------------')
+    print('CBIC Quality Control Analysis')
+    print('-----------------------------')
     print('Version : {}'.format(ver))
     print('')
+    print('BIDS Directory : {}'.format(bids_dir))
+    print('Subject : {}'.format(subj_id))
+    print('Session : {}'.format(sess_id))
 
-    qc = CBICQC(mcf_fname, mopars_fname, report_fname)
-    fnames = qc.run()
-
-    # Open report PDF
-    os.system('open {}'.format(fnames['ReportPDF']))
+    qc = CBICQC(bids_dir, subj_id, sess_id)
+    qc.run()
 
     # Clean exit
     sys.exit(0)
