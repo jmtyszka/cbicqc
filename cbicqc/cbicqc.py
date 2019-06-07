@@ -36,11 +36,15 @@ SOFTWARE.
 
 import os
 import sys
+import subprocess
 import json
 import tempfile
+import shutil
 import numpy as np
 import nibabel as nb
-import SimpleITK as sitk
+import datetime as dt
+
+from nipype.interfaces.fsl import MCFLIRT
 
 from bids import BIDSLayout
 
@@ -60,14 +64,20 @@ class CBICQC:
         self._subject = subject
         self._session = session
 
-        # Create safe temporary directory
+        # Create work and report directories
         self._work_dir = tempfile.mkdtemp()
-        self._report_fname = os.path.join(self._work_dir, 'report.pdf')
+        self._report_dir = os.path.join(self._bids_dir, 'derivatives', 'cbicqc')
+        os.makedirs(self._report_dir, exist_ok=True)
 
         # Intermediate filenames
+        self._report_fname = os.path.join(self._work_dir, 'report.pdf')
         self._tmean_fname = os.path.join(self._work_dir, 'tmean.nii.gz')
         self._tsd_fname = os.path.join(self._work_dir, 'tsd.nii.gz')
         self._roi_labels_fname = os.path.join(self._work_dir, 'roi_labels.nii.gz')
+        self._roi_ts_png = os.path.join(self._work_dir, 'roi_timeseries.png')
+        self._mopar_ts_png = os.path.join(self._work_dir, 'mopar_timeseries.png')
+        self._tmean_montage_png = os.path.join(self._work_dir, 'tmean_montage.png')
+        self._tsd_montage_png = os.path.join(self._work_dir, 'tsd_montage.png')
 
         # Flags
         self._save_intermediates = False
@@ -117,7 +127,11 @@ class CBICQC:
         meta['MatrixSize'] = ' x '.join(str(x) for x in qc_nii.shape)
 
         # Perform rigid body motion correction on QC series
+        print('  Starting motion correction')
+        t0 = dt.datetime.now()
         qc_moco_nii, qc_moco_pars = self._moco(qc_nii)
+        t1 = dt.datetime.now()
+        print('  Completed motion correction in {} seconds'.format((t1-t0).seconds))
 
         # Temporal mean and sd images
         print('  Calculating temporal mean image')
@@ -139,24 +153,12 @@ class CBICQC:
         metrics = self._qc_metrics(fit_results)
 
         #
-        # Plot graphs
+        # Create report images
         #
-
-        roi_ts_fname = os.path.join(self._work_dir, 'roi_timeseries.png')
-        plot_roi_timeseries(s_mean_t, s_detrend_t, roi_ts_fname)
-
-        mopar_ts_fname = os.path.join(self._work_dir, 'mopar_timeseries.png')
-        plot_mopar_timeseries(qc_moco_pars, mopar_ts_fname)
-
-        #
-        # Create orthoslice images
-        #
-
-        tmean_montage_fname = os.path.join(self._work_dir, 'tmean_montage.png')
-        orthoslice_montage(tmean_nii, tmean_montage_fname)
-
-        tsd_montage_fname = os.path.join(self._work_dir, 'tsd_montage.png')
-        orthoslice_montage(tsd_nii, tsd_montage_fname)
+        plot_roi_timeseries(s_mean_t, s_detrend_t, self._roi_ts_png)
+        plot_mopar_timeseries(qc_moco_pars, self._mopar_ts_png)
+        orthoslice_montage(tmean_nii, self._tmean_montage_png)
+        orthoslice_montage(tsd_nii, self._tsd_montage_png)
 
         # OPTIONAL: Save intermediate images
         if self._save_intermediates:
@@ -169,18 +171,26 @@ class CBICQC:
         # Construct filename dictionary to pass to PDF generator
         fnames = dict(TempDir=self._work_dir,
                       ReportPDF=self._report_fname,
-                      ROITimeseries=roi_ts_fname,
-                      MoparTimeseries=mopar_ts_fname,
-                      TMeanMontage=tmean_montage_fname,
-                      TSDMontage=tsd_montage_fname,
+                      ROITimeseries=self._roi_ts_png,
+                      MoparTimeseries=self._mopar_ts_png,
+                      TMeanMontage=self._tmean_montage_png,
+                      TSDMontage=self._tsd_montage_png,
                       TMean=self._tmean_fname,
                       TSD=self._tsd_fname,
                       ROILabels = self._roi_labels_fname)
 
-        # Generate and save PDF report
+        # Generate PDF report
         ReportPDF(fnames, meta, metrics)
 
-        return fnames
+        # Copy final report to derivatives
+        self._save_report(fnames)
+
+        # Cleanup temporary QC directory
+        self.cleanup()
+
+    def cleanup(self):
+
+        shutil.rmtree(self._work_dir)
 
     def _default_metadata(self):
 
@@ -227,8 +237,8 @@ class CBICQC:
         noise_mean = air_res.x[3]
 
         metrics = dict()
-        metrics['SFNR'] = phantom_mean / noise_mean
         metrics['PhantomMean'] = phantom_mean
+        metrics['SFNR'] = phantom_mean / noise_mean
         metrics['SigArtRatio'] = phantom_mean / nyquist_mean
         metrics['NoiseFloor'] = noise_mean
         metrics['Drift'] = phantom_drift / phantom_mean * 100
@@ -238,70 +248,39 @@ class CBICQC:
         return metrics
 
     def _moco(self, img_nii):
+        """
+        Light wrapper for MCFLIRT (no need to use nipype)
 
-        img = img_nii.get_data()
-        moco = np.zeros_like(img)
+        :param img_nii:
+        :return:
+        """
 
-        # Reference image
-        img_0 = img[:, :, :, 0]
+        in_fname = os.path.join(self._work_dir, 'qc.nii.gz')
+        out_stub = os.path.join(self._work_dir, 'qc_mcf')
 
-        # Loop over remaining images
-        for tc in range(1, img.shape[3]):
+        nb.save(img_nii, in_fname)
 
-            img_t = img[:, :, :, tc]
+        mcflirt_cmd = os.path.join(os.environ['FSLDIR'], 'bin', 'mcflirt')
 
-            img_t_0, tx_pars = self._rigid_register(img_t, img_0)
+        subprocess.run([mcflirt_cmd, '-in', in_fname, '-out', out_stub, '-meanvol', '-plots'])
 
-            moco[:, :, :, tc] = img_t_0
-
-        moco_nii = nb.Nifti1Image(moco, img_nii.affine)
-
-        moco_pars = np.zeros([img.shape[3], 6])
+        moco_nii = nb.load(out_stub + '.nii.gz')
+        moco_pars = np.genfromtxt(out_stub + '.par')
 
         return moco_nii, moco_pars
 
-    def _rigid_register(self, img, ref):
+    def _save_report(self, fnames):
 
-        fixed_image = sitk.GetImageFromArray(ref)
-        moving_image = sitk.GetImageFromArray(img)
+        # Save report to derivatives directory
+        report_pdf = os.path.join(self._report_dir, '{}_{}_qc.pdf'.format(self._subject, self._session))
 
-        initial_transform = sitk.CenteredTransformInitializer(fixed_image,
-                                                              moving_image,
-                                                              sitk.Euler3DTransform(),
-                                                              sitk.CenteredTransformInitializerFilter.GEOMETRY)
+        if os.path.isfile(report_pdf):
+            os.remove(report_pdf)
+        elif os.path.isdir(report_pdf):
+            shutil.rmtree(report_pdf)
 
-        # Setup image registration
-        registration_method = sitk.ImageRegistrationMethod()
+        print('Saving QC report to {}'.format(report_pdf))
+        shutil.copyfile(fnames['ReportPDF'], report_pdf)
 
-        # Similarity metric settings.
-        registration_method.SetMetricAsMattesMutualInformation(numberOfHistogramBins=50)
-        registration_method.SetMetricSamplingStrategy(registration_method.RANDOM)
-        registration_method.SetMetricSamplingPercentage(0.01)
 
-        registration_method.SetInterpolator(sitk.sitkLinear)
-
-        # Optimizer settings.
-        registration_method.SetOptimizerAsGradientDescent(learningRate=1.0,
-                                                          numberOfIterations=100,
-                                                          convergenceMinimumValue=1e-6,
-                                                          convergenceWindowSize=10)
-
-        registration_method.SetOptimizerScalesFromPhysicalShift()
-
-        # Setup for the multi-resolution framework.
-        registration_method.SetShrinkFactorsPerLevel(shrinkFactors=[4, 2, 1])
-        registration_method.SetSmoothingSigmasPerLevel(smoothingSigmas=[2, 1, 0])
-        registration_method.SmoothingSigmasAreSpecifiedInPhysicalUnitsOn()
-
-        # Don't optimize in-place, we would possibly like to run this cell multiple times.
-        registration_method.SetInitialTransform(initial_transform, inPlace=False)
-
-        # Run registration
-        final_transform = registration_method.Execute(sitk.Cast(fixed_image, sitk.sitkFloat32),
-                                                      sitk.Cast(moving_image, sitk.sitkFloat32))
-
-        moving_resampled = sitk.Resample(moving_image, fixed_image, final_transform, sitk.sitkLinear, 0.0,
-                                         moving_image.GetPixelID())
-
-        return moving_resampled, final_transform
 

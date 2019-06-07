@@ -60,8 +60,8 @@ def main():
     # Parse command line arguments
     args = parser.parse_args()
     bids_dir = os.path.realpath(args.dir)
-    subj_id = os.path.realpath(args.sub)
-    sess_id = os.path.realpath(args.ses)
+    subj_id = args.sub
+    sess_id = args.ses
 
     # Read version from setup.py
     ver = pkg_resources.get_distribution('cbicqc').version
@@ -75,7 +75,13 @@ def main():
     print('')
     print('BIDS Directory : {}'.format(bids_dir))
     print('Subject : {}'.format(subj_id))
-    print('Subject : {}'.format(sess_id))
+    print('Session : {}'.format(sess_id))
+
+    # Setup QC analysis
+    qc = CBICQC(bids_dir, subj_id, sess_id)
+
+    # Run analysis
+    qc.run()
 
     # Clean exit
     sys.exit(0)

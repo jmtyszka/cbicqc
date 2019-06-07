@@ -43,16 +43,6 @@ def metrics():
 #     nyquist_spikes = (np.abs(nyquist_res) > 5 * nyquist_res_sigma).sum()
 #     noise_spikes = (np.abs(noise_res) > 5 * noise_res_sigma).sum()
 #
-#     # Calculate percent drift over course of acquisition (use fitted curve)
-#     phantom_drift = (phantom_fit[nv - 1] - phantom_fit[0]) / phantom_fit[0] * 100.0
-#     nyquist_drift = (nyquist_fit[nv - 1] - nyquist_fit[0]) / nyquist_fit[0] * 100.0
-#     noise_drift = (noise_fit[nv - 1] - noise_fit[0]) / noise_fit[0] * 100.0
-#
-#     # Append mean, spike count, drift to fit parameters
-#     phantom_opt = np.append(phantom_opt, [phantom_mean, phantom_spikes, phantom_drift])
-#     nyquist_opt = np.append(nyquist_opt, [nyquist_mean, nyquist_spikes, nyquist_drift])
-#     noise_opt = np.append(noise_opt, [noise_mean, noise_spikes, noise_drift])
-#
 #     # SNR relative to mean noise
 #     # Estimate spatial noise sigma (assuming underlying Gaussian and Half-Normal distribution)
 #     # sigma = mean(noise) * sqrt(pi/2)
@@ -66,14 +56,6 @@ def metrics():
 #     phantom_0 = phantom_res + phantom_mean
 #     nyquist_0 = nyquist_res + nyquist_mean
 #     noise_0 = noise_res + noise_mean
-#
-#     # Create array with detrended timeseries in columns (for output by np.savetxt)
-#     ts_detrend = np.array([phantom_0, nyquist_0, noise_0])
-#     ts_detrend = ts_detrend.transpose()
-#
-#     # Create array with timeseries detrend parameters in rows for each model
-#     # Parameter order : Exp amp, Exp tau, linear, const, spike count
-#     stats_pars = np.row_stack([phantom_opt, nyquist_opt, noise_opt])
 #
 #     #
 #     # Apparent motion parameters

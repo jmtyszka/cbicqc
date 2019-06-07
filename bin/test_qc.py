@@ -77,7 +77,10 @@ def main():
     print('Subject : {}'.format(subj_id))
     print('Session : {}'.format(sess_id))
 
+    # Setup QC analysis
     qc = CBICQC(bids_dir, subj_id, sess_id)
+
+    # Run analysis
     qc.run()
 
     # Clean exit
