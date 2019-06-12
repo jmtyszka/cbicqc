@@ -35,11 +35,13 @@ def temporal_mean_sd(qc_moco_nii):
     # Temporal mean of 4D timeseries
     tmean = np.mean(qc_moco_nii.get_data(), axis=3)
     tsd = np.std(qc_moco_nii.get_data(), axis=3)
+    tsfnr = tmean / tsd
 
     tmean_nii = nb.Nifti1Image(tmean, qc_moco_nii.affine)
     tsd_nii = nb.Nifti1Image(tsd, qc_moco_nii.affine)
+    tsfnr_nii = nb.Nifti1Image(tsfnr, qc_moco_nii.affine)
 
-    return tmean_nii, tsd_nii
+    return tmean_nii, tsd_nii, tsfnr_nii
 
 
 def extract_timeseries(qc_moco_nii, rois_nii):
@@ -82,9 +84,9 @@ def detrend_timeseries(s_mean_t):
 
     for lc in range(0, nl):
 
-        s = s_mean_t[lc, :]
+        s_t = s_mean_t[lc, :]
 
-        s_min, s_max, s_mean = np.min(s), np.max(s), np.mean(s)
+        s_min, s_max, s_mean = np.min(s_t), np.max(s_t), np.mean(s_t)
         s_rng = s_max - s_min
 
         x0 = [s_rng, 5, -s_rng / nt, s_mean]
@@ -96,17 +98,15 @@ def detrend_timeseries(s_mean_t):
                                method='trf',
                                loss='huber',
                                bounds=bounds,
-                               args=(t, s))
+                               args=(t, s_t))
 
         # Fitted curve
         s_fit = explin(result.x, t, 0)
 
-        # Detrend original timeseries
-        s_detrend_t[lc, :] = s - s_fit + s_mean
+        # Add fit residual to temporal mean - detrended timeseries
+        s_detrend_t[lc, :] = s_mean + result.fun
 
         fit_results.append(result)
-
-    # Extract signal-to-nyquist ratio, SNR, drift rate, warmup amplitude and time-constant
 
     return fit_results, s_detrend_t
 

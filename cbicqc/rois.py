@@ -61,15 +61,16 @@ def roi_labels(tmean_nii):
     signal_mask = tmean > th
 
     # Construct 3D binary sphere structuring element
-    k = generate_binary_structure(3, 1)  # 3D, 1-connected
+    k = generate_binary_structure(3, 2)  # 3D, 2-connected
     # k = iterate_structure(k, iterations=1)
 
-    # Erode signal mask once, then dilate twice (open + dilate)
-    signal_mask_ero = binary_erosion(signal_mask, structure=k, iterations=1)
-    signal_mask_dil = binary_dilation(signal_mask_ero, structure=k, iterations=2)
+    # Erode signal mask x N, then dilate x 2N
+    n_iter = 2
+    signal_mask_ero = binary_erosion(signal_mask, structure=k, iterations=n_iter)
+    signal_mask_dil = binary_dilation(signal_mask_ero, structure=k, iterations=n_iter * 2)
 
     # Create Nyquist mask by rolling eroded signal mask by FOVy/2
-    nyquist_mask = np.roll(signal_mask_ero, (0, int(ny / 2), 0))
+    nyquist_mask = np.roll(signal_mask_ero, int(ny / 2), axis=1)
 
     # Exclusive Nyquist ghost mask (remove overlap with dilated signal mask)
     nyquist_only_mask = np.logical_and(nyquist_mask, np.logical_not(np.logical_and(nyquist_mask, signal_mask_dil)))
@@ -87,3 +88,12 @@ def roi_labels(tmean_nii):
     rois_nii = nb.Nifti1Image(rois, tmean_nii.affine)
 
     return rois_nii
+
+
+def calc_roi_stats(tmean_nii, tsd_nii, tsfnr_nii, rois_nii):
+
+    roi_stats = dict()
+
+    roi_stats['SFNR'] = 0.0
+
+    return roi_stats

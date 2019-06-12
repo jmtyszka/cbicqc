@@ -1,6 +1,6 @@
 # !/usr/bin/env python
 """
-CBICQC quality metrics
+Quality control metric calculations from ROI timeseries fit results
 
 AUTHOR : Mike Tyszka
 PLACE  : Caltech
@@ -25,64 +25,82 @@ Copyright 2019 California Institute of Technology.
 """
 
 import numpy as np
-from scipy.optimize import least_squares
-from scipy.signal import medfilt
-import nibabel as nb
 
-def metrics():
 
-#     # Residual Gaussian sigma estimation
-#     # Assumes Gaussian white noise + sparse outlier spikes
-#     # Use robust estimate of residual sd (MAD * 1.4826)
-#     phantom_res_sigma = np.median(np.abs(phantom_res)) * 1.4826
-#     nyquist_res_sigma = np.median(np.abs(nyquist_res)) * 1.4826
-#     noise_res_sigma = np.median(np.abs(noise_res)) * 1.4826
-#
-#     # Count spikes, defined as residuals more than 5 SD from zero
-#     phantom_spikes = (np.abs(phantom_res) > 5 * phantom_res_sigma).sum()
-#     nyquist_spikes = (np.abs(nyquist_res) > 5 * nyquist_res_sigma).sum()
-#     noise_spikes = (np.abs(noise_res) > 5 * noise_res_sigma).sum()
-#
-#     # SNR relative to mean noise
-#     # Estimate spatial noise sigma (assuming underlying Gaussian and Half-Normal distribution)
-#     # sigma = mean(noise) * sqrt(pi/2)
-#     # See for example http://en.wikipedia.org/wiki/Half-normal_distribution
-#
-#     noise_sigma = noise_mean * sqrt(pi / 2)
-#     phantom_snr = phantom_mean / noise_sigma
-#     nyquist_snr = nyquist_mean / noise_sigma
-#
-#     # Generate detrended timeseries - add back constant offset for each ROI
-#     phantom_0 = phantom_res + phantom_mean
-#     nyquist_0 = nyquist_res + nyquist_mean
-#     noise_0 = noise_res + noise_mean
-#
-#     #
-#     # Apparent motion parameters
-#     #
-#     print('    Analyzing motion parameters')
-#     qc_mcf_parfile = os.path.join(qc_dir, 'qc_mcf.par')
-#
-#     if not os.path.isfile(qc_mcf_parfile):
-#         print(qc_mcf_parfile + ' does not exist - exiting')
-#         sys.exit(0)
-#
-#     # N x 6 array (6 motion parameters in columns)
-#     x = np.loadtxt(qc_mcf_parfile)
-#
-#     # Extract displacement timeseries for each axis
-#     dx = x[:, 3]
-#     dy = x[:, 4]
-#     dz = x[:, 5]
-#
-#     # Calculate max absolute displacements (in microns) for each axis
-#     max_adx = (np.abs(dx)).max() * 1000.0
-#     max_ady = (np.abs(dy)).max() * 1000.0
-#     max_adz = (np.abs(dz)).max() * 1000.0
+def qc_metrics(fit_results, tsfnr_nii, rois_nii):
+    """
+    Calculate QC metrics for each ROI
 
+    :param fit_results: list, fit objects from scipy least_squares
+    :return metrics:, dict, QC metric results dictionary
+    """
+
+    # TODO:
+    # EMI analysis with zipper identification
+    # Coil element SNR and fluctuation analysis
+
+    phantom_a_warm = fit_results[0].x[0]
+    phantom_t_warm = fit_results[0].x[1]
+    phantom_drift = fit_results[0].x[2]
+    phantom_mean = fit_results[0].x[3]
+    nyquist_mean = fit_results[1].x[3]
+    noise_mean = fit_results[2].x[3]
+
+    # Calculate Phantom tSFNR
+    tsfnr = calc_tsfnr(tsfnr_nii, rois_nii)
+
+    # Create and fill dictionary of QC metrics
     metrics = dict()
 
+    metrics['PhantomMean'] = phantom_mean
+    metrics['SNR'] = phantom_mean / noise_mean
+    metrics['SFNR'] = tsfnr
+    metrics['SArtR'] = phantom_mean / nyquist_mean
+    metrics['Drift'] = phantom_drift / phantom_mean * 100
+    metrics['WarmupAmp'] = phantom_a_warm / phantom_mean * 100
+    metrics['WarmupTime'] = phantom_t_warm
+
+    # SNR relative to mean noise
+    # Estimate spatial noise sigma (assuming underlying Gaussian and Half-Normal distribution)
+    # sigma = mean(noise) * sqrt(pi/2)
+    # See for example http://en.wikipedia.org/wiki/Half-normal_distribution
+
+    metrics['NoiseSigma'] = noise_mean * np.sqrt(np.pi/2)
+    metrics['NoiseFloor'] = noise_mean
+    metrics['PhantomSpikes'] = spike_count(fit_results[0].fun)
+    metrics['NyquistSpikes'] = spike_count(fit_results[1].fun)
+    metrics['AirSpikes'] = spike_count(fit_results[2].fun)
+
     return metrics
+
+
+def spike_count(points, thresh=3.5):
+    """
+
+    :param points:
+    :param thresh:
+    :return:
+    """
+
+    if len(points.shape) == 1:
+        points = points[:, None]
+
+    # Median absolute deviation from the median (MAD)
+    med = np.median(points, axis=0)
+    dev = np.abs(points - med)
+    mad = np.median(dev)
+
+    modified_z_score = 0.6745 * dev / mad
+
+    return np.sum(modified_z_score > thresh)
+
+
+def calc_tsfnr(tsfnr_nii, rois_nii):
+
+    tsfnr_img = tsfnr_nii.get_data()
+    rois_img = rois_nii.get_data()
+
+    return np.mean(tsfnr_img[rois_img == 1])
 
 
 

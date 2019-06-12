@@ -151,6 +151,7 @@ setup(
                       'nipype',
                       'reportlab',
                       'scikit-image',
+                      'statsmodels>=0.9.0',
                       'pynetdicom>=1.2.0'],  # Optional
 
     # List additional groups of dependencies here (e.g. development

@@ -38,7 +38,7 @@ SOFTWARE.
 """
 
 import os
-import io
+import shutil
 import datetime as dt
 
 from reportlab.lib.enums import TA_JUSTIFY
@@ -61,6 +61,7 @@ class ReportPDF:
         self._fnames = fnames
         self._meta = meta
         self._metrics = metrics
+        self._tmp_report_pdf = os.path.join(fnames['WorkDir'], 'report.pdf')
 
         # Contents - list of flowables to be built into a document
         self._contents = []
@@ -71,15 +72,18 @@ class ReportPDF:
 
         self._init_pdf()
         self._add_summary()
-        self._add_graphs()
-        self._add_slices()
+        self._add_roi_timeseries()
+        self._add_motion_timeseries()
+        self._add_sections()
+        self._add_demeaned_ts()
 
         self._doc.build(self._contents)
+        self._save_report()
 
     def _init_pdf(self):
 
         # Create a new PDF document
-        self._doc = SimpleDocTemplate(self._fnames['ReportPDF'],
+        self._doc = SimpleDocTemplate(self._tmp_report_pdf,
                                       pagesize=letter,
                                       rightMargin=0.5 * inch,
                                       leftMargin=0.5 * inch,
@@ -110,7 +114,9 @@ class ReportPDF:
                 ['Scan Time', self._meta['AcquisitionTime']],
                 ['Software Version', self._meta['SoftwareVersions']],
                 ['Pulse Sequence', self._meta['SequenceName']],
-                ['Coil Name', self._meta['ReceiveCoilName']]]
+                ['Coil Name', self._meta['ReceiveCoilName']],
+                ['', '']
+                ]
 
         image = [['Repetition Time', '{} ms'.format(self._meta['RepetitionTime'] * 1e3)],
                  ['Echo Time', '{} ms'.format(self._meta['EchoTime'] * 1e3)],
@@ -126,39 +132,47 @@ class ReportPDF:
         self._contents.append(Table([[demo_table, image_table]]))
         self._contents.append(Spacer(1, 0.25 * inch))
 
-        # TODO:
-        # Spike metrics
-        # EMI analysis with zipper identification
-        # Graymap noise and fluctuation image
-        # Power spectra
-        # Weisskopf plot (spatial noise coherence)
-        # Nyquist fluctuation metrics
-        # Phantom mean signal as reference intensity
-        # Coil element SNR and fluctuation analysis
-        # Improve temporal mean and SD image windowing
-
         #
         # QC metrics
         #
 
         ptext = '<font size=14><b>Quality Metrics</b></font>'
         self._contents.append(Paragraph(ptext, self._pstyles['Justify']))
-        self._contents.append(Spacer(1, 0.1 * inch))
-
-        qc_metrics = [['Mean Phantom Signal', '{:.1f}'.format(self._metrics['PhantomMean'])],
-                      ['Signal/Fluctuation Noise Ratio', '{:.1f}'.format(self._metrics['SFNR'])],
-                      ['Signal/Artifact Ratio', '{:.1f}'.format(self._metrics['SigArtRatio'])],
-                      ['Noise Floor', '{:.1f}'.format(self._metrics['NoiseFloor'])],
-                      ['Drift', '{:.3f} %/TR'.format(self._metrics['Drift'])],
-                      ['Warmup Amplitude', '{:.3f} %'.format(self._metrics['WarmupAmp'])],
-                      ['Warmup Time Constant', '{:.1f} TRs'.format(self._metrics['WarmupTime'])]]
-
-        qc_table = Table(qc_metrics, hAlign='LEFT')
-
-        self._contents.append(qc_table)
         self._contents.append(Spacer(1, 0.25 * inch))
 
-    def _add_graphs(self):
+        signal_metrics = [['Mean Signal', '{:.1f}'.format(self._metrics['PhantomMean'])],
+                          ['SNR', '{:.1f}'.format(self._metrics['SNR'])],
+                          ['SFNR', '{:.1f}'.format(self._metrics['SFNR'])],
+                          ['SArtR', '{:.1f}'.format(self._metrics['SArtR'])],
+                          ['Drift', '{:.3f} %/TR'.format(self._metrics['Drift'])],
+                          ['Warmup Amplitude', '{:.3f} %'.format(self._metrics['WarmupAmp'])],
+                          ['Warmup Time Constant', '{:.1f} TRs'.format(self._metrics['WarmupTime'])]
+                          ]
+
+        ptext = '<font size=11><b>Phantom Signal</b></font>'
+        self._contents.append(Paragraph(ptext, self._pstyles['Justify']))
+        self._contents.append(Spacer(1, 0.1 * inch))
+
+        signal_table = Table(signal_metrics, hAlign='LEFT')
+        self._contents.append(signal_table)
+        self._contents.append(Spacer(1, 0.25 * inch))
+
+        noise_metrics = [['Noise Sigma', '{:.1f}'.format(self._metrics['NoiseSigma'])],
+                         ['Noise Floor', '{:.1f}'.format(self._metrics['NoiseFloor'])],
+                         ['Phantom Spikes', '{}'.format(self._metrics['PhantomSpikes'])],
+                         ['Nyquist Ghost Spikes', '{}'.format(self._metrics['NyquistSpikes'])],
+                         ['Air Spikes', '{}'.format(self._metrics['AirSpikes'])],
+                         ]
+
+        ptext = '<font size=11><b>Noise and Spiking</b></font>'
+        self._contents.append(Paragraph(ptext, self._pstyles['Justify']))
+        self._contents.append(Spacer(1, 0.1 * inch))
+
+        noise_table = Table(noise_metrics, hAlign='LEFT')
+        self._contents.append(noise_table)
+        self._contents.append(Spacer(1, 0.25 * inch))
+
+    def _add_roi_timeseries(self):
 
         # Page break
         self._contents.append(PageBreak())
@@ -187,6 +201,33 @@ class ReportPDF:
         self._contents.append(Spacer(1, 0.5 * inch))
 
         #
+        # ROI Spatial Mean Power Spectrum
+        #
+
+        ptext = '<font size=14><b>ROI Power Spectra</b></font>'
+        self._contents.append(Paragraph(ptext, self._pstyles['Justify']))
+        self._contents.append(Spacer(1, 0.25 * inch))
+
+        ptext = """
+        <font size=11>
+        Power spectrum of the spatial mean signal in each ROI. The dB scale is relative to maximum spectral power.
+        </font>
+        """
+        self._contents.append(Paragraph(ptext, self._pstyles['Justify']))
+        self._contents.append(Spacer(1, 0.1 * inch))
+
+        roi_ps_img = Image(self._fnames['ROIPowerspec'], 7.0 * inch, 3.5 * inch, hAlign='LEFT')
+        self._contents.append(roi_ps_img)
+
+        self._contents.append(Spacer(1, 0.5 * inch))
+
+
+    def _add_motion_timeseries(self):
+
+        # Page break
+        self._contents.append(PageBreak())
+
+        #
         # Motion Parameter Timeseries
         #
 
@@ -194,63 +235,89 @@ class ReportPDF:
         self._contents.append(Paragraph(ptext, self._pstyles['Justify']))
         self._contents.append(Spacer(1, 0.25 * inch))
 
+        # Phantom QC specific text
         ptext = """
         <font size=11>
-        These three graphs show the evolution over time of displacement and rotation parameters required
-        to register the phantom image at a given time to the mean phantom image over the entire series. 
+        Displacement and rotation parameter timecourses required
+        to register the center of mass at a given time to the center of mass of the first image. 
         </font>
         """
         self._contents.append(Paragraph(ptext, self._pstyles['Justify']))
         self._contents.append(Spacer(1, 0.1 * inch))
 
-        roi_ts_img = Image(self._fnames['MoparTimeseries'], 7.0 * inch, 3.5 * inch, hAlign='LEFT')
-        self._contents.append(roi_ts_img)
-
-    def _add_slices(self):
-
-        # Page break
-        self._contents.append(PageBreak())
-
-        #
-        # Temporal Mean Image
-        #
-
-        ptext = '<font size=14><b>Temporal Mean Image</b></font>'
-        self._contents.append(Paragraph(ptext, self._pstyles['Justify']))
-        self._contents.append(Spacer(1, 0.25 * inch))
-
-        ptext = """
-        <font size=11>
-        Axial, coronal and sagittal sections through the temporal mean image
-        following motion correction. 
-        </font>
-        """
-        self._contents.append(Paragraph(ptext, self._pstyles['Justify']))
-        self._contents.append(Spacer(1, 0.1 * inch))
-
-        tmean_montage_img = Image(self._fnames['TMeanMontage'], 7.0 * inch, 2.4 * inch, hAlign='LEFT')
-        self._contents.append(tmean_montage_img)
+        mo_ts_img = Image(self._fnames['MoparTimeseries'], 7.0 * inch, 3.5 * inch, hAlign='LEFT')
+        self._contents.append(mo_ts_img)
 
         self._contents.append(Spacer(1, 0.5 * inch))
 
         #
-        # Temporal SD Image
+        # Motion Power Spectra
         #
 
-        ptext = '<font size=14><b>Temporal SD Image</b></font>'
+        ptext = '<font size=14><b>Motion Power Spectra</b></font>'
         self._contents.append(Paragraph(ptext, self._pstyles['Justify']))
         self._contents.append(Spacer(1, 0.25 * inch))
 
         ptext = """
         <font size=11>
-        Axial, coronal and sagittal sections through the temporal standard deviation image
-        following motion correction. 
+        Power spectrum of the absolute displacement and total rotation timecourses.
+        The dB scale is relative to maximum spectral power.
         </font>
         """
         self._contents.append(Paragraph(ptext, self._pstyles['Justify']))
         self._contents.append(Spacer(1, 0.1 * inch))
 
-        tsd_montage_img = Image(self._fnames['TSDMontage'], 7.0 * inch, 2.4 * inch, hAlign='LEFT')
-        self._contents.append(tsd_montage_img)
+        mo_ts_img = Image(self._fnames['MoparPowerspec'], 7.0 * inch, 3.5 * inch, hAlign='LEFT')
+        self._contents.append(mo_ts_img)
+
+        self._contents.append(Spacer(1, 0.5 * inch))
+
+    def _add_sections(self):
+
+        # Page break
+        self._contents.append(PageBreak())
+
+        ptext = '<font size=14><b>Image Sections</b></font>'
+        self._contents.append(Paragraph(ptext, self._pstyles['Justify']))
+        self._contents.append(Spacer(1, 0.25 * inch))
+
+        self._add_section('Temporal Mean', self._fnames['TMeanMontage'])
+        self._add_section('Temporal Standard Deviation', self._fnames['TSDMontage'])
+        self._add_section('Regions of Interest', self._fnames['ROIsMontage'])
+
+    def _add_section(self, title, img_fname):
+
+        ptext = '<font size=11><b>{}</b></font>'.format(title)
+        self._contents.append(Paragraph(ptext, self._pstyles['Justify']))
+        self._contents.append(Spacer(1, 0.1 * inch))
+
+        tmean_montage_img = Image(img_fname, 7.0 * inch, 2.4 * inch, hAlign='LEFT')
+
+        self._contents.append(tmean_montage_img)
+        self._contents.append(Spacer(1, 0.25 * inch))
+
+    def _add_demeaned_ts(self):
+
+        # Page break
+        self._contents.append(PageBreak())
+
+        ptext = '<font size=14><b>Demeaned Signal</b></font>'
+        self._contents.append(Paragraph(ptext, self._pstyles['Justify']))
+        self._contents.append(Spacer(1, 0.25 * inch))
+
+        ptext = """
+        <font size=11>
+        Demeaned signal timecourses for a subsample of voxels from each ROI.
+        </font>
+        """
+        self._contents.append(Paragraph(ptext, self._pstyles['Justify']))
+        self._contents.append(Spacer(1, 0.1 * inch))
+
+        residuals_img = Image(self._fnames['ROIDemeanedTS'], 7.0 * inch, 9.0 * inch, hAlign='LEFT')
+        self._contents.append(residuals_img)
+
+    def _save_report(self):
+
+        shutil.copyfile(self._tmp_report_pdf, self._fnames['ReportPDF'])
 
 

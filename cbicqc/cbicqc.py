@@ -36,7 +36,6 @@ SOFTWARE.
 
 import os
 import sys
-import subprocess
 import json
 import tempfile
 import shutil
@@ -44,15 +43,16 @@ import numpy as np
 import nibabel as nb
 import datetime as dt
 
-from nipype.interfaces.fsl import MCFLIRT
-
 from bids import BIDSLayout
 
 from .timeseries import temporal_mean_sd, extract_timeseries, detrend_timeseries
-from .graphics import (plot_roi_timeseries,
-                       plot_mopar_timeseries,
-                       orthoslice_montage)
+from .graphics import (plot_roi_timeseries, plot_roi_powerspec,
+                       plot_mopar_timeseries, plot_mopar_powerspec,
+                       orthoslices,
+                       roi_demeaned_ts)
 from .rois import roi_labels
+from .metrics import qc_metrics
+from .moco import moco_phantom, moco_live
 from .report import ReportPDF
 
 
@@ -70,20 +70,25 @@ class CBICQC:
         os.makedirs(self._report_dir, exist_ok=True)
 
         # Intermediate filenames
-        self._report_fname = os.path.join(self._work_dir, 'report.pdf')
+        self._report_pdf = os.path.join(self._report_dir, '{}_{}_qc.pdf'.format(self._subject, self._session))
         self._tmean_fname = os.path.join(self._work_dir, 'tmean.nii.gz')
         self._tsd_fname = os.path.join(self._work_dir, 'tsd.nii.gz')
         self._roi_labels_fname = os.path.join(self._work_dir, 'roi_labels.nii.gz')
         self._roi_ts_png = os.path.join(self._work_dir, 'roi_timeseries.png')
+        self._roi_ps_png = os.path.join(self._work_dir, 'roi_powerspec.png')
         self._mopar_ts_png = os.path.join(self._work_dir, 'mopar_timeseries.png')
+        self._mopar_pspec_png = os.path.join(self._work_dir, 'mopar_powerspec.png')
         self._tmean_montage_png = os.path.join(self._work_dir, 'tmean_montage.png')
         self._tsd_montage_png = os.path.join(self._work_dir, 'tsd_montage.png')
+        self._rois_montage_png = os.path.join(self._work_dir, 'rois_montage.png')
+        self._rois_demeaned_png = os.path.join(self._work_dir, 'rois_demeaned.png')
 
         # Flags
         self._save_intermediates = False
 
     def run(self):
 
+        print('')
         print('Starting CBIC QC analysis')
 
         # Get BIDS layout
@@ -129,13 +134,15 @@ class CBICQC:
         # Perform rigid body motion correction on QC series
         print('  Starting motion correction')
         t0 = dt.datetime.now()
-        qc_moco_nii, qc_moco_pars = self._moco(qc_nii)
+
+        qc_moco_nii, qc_moco_pars = self._moco(qc_nii, skip=False)
+
         t1 = dt.datetime.now()
         print('  Completed motion correction in {} seconds'.format((t1-t0).seconds))
 
         # Temporal mean and sd images
         print('  Calculating temporal mean image')
-        tmean_nii, tsd_nii = temporal_mean_sd(qc_moco_nii)
+        tmean_nii, tsd_nii, tsfnr_nii = temporal_mean_sd(qc_moco_nii)
 
         # Create ROI labels
         print('  Constructing ROI labels')
@@ -150,15 +157,36 @@ class CBICQC:
         fit_results, s_detrend_t = detrend_timeseries(s_mean_t)
 
         # Calculate QC metrics
-        metrics = self._qc_metrics(fit_results)
+        metrics = qc_metrics(fit_results, tsfnr_nii, rois_nii)
+
+        # Time vector (seconds)
+        t = np.arange(0, s_mean_t.shape[1]) * meta['RepetitionTime']
 
         #
-        # Create report images
+        # Generate PDF Report
         #
-        plot_roi_timeseries(s_mean_t, s_detrend_t, self._roi_ts_png)
-        plot_mopar_timeseries(qc_moco_pars, self._mopar_ts_png)
-        orthoslice_montage(tmean_nii, self._tmean_montage_png)
-        orthoslice_montage(tsd_nii, self._tsd_montage_png)
+
+        print('')
+        print('Generating Report')
+
+        # Create report images
+        print('  Creating report images')
+
+        print('    ROI Timeseries')
+        plot_roi_timeseries(t, s_mean_t, s_detrend_t, self._roi_ts_png)
+        plot_roi_powerspec(t, s_detrend_t, self._roi_ps_png)
+
+        print('    Motion Timeseries')
+        plot_mopar_timeseries(t, qc_moco_pars, self._mopar_ts_png)
+        plot_mopar_powerspec(t, qc_moco_pars, self._mopar_pspec_png)
+
+        print('    ROI Residuals')
+        roi_demeaned_ts(qc_moco_nii, rois_nii, self._rois_demeaned_png)
+
+        print('    Orthoslices')
+        orthoslices(tmean_nii, self._tmean_montage_png, cmap='gray', irng='robust')
+        orthoslices(tsd_nii, self._tsd_montage_png, cmap='viridis', irng='robust')
+        orthoslices(rois_nii, self._rois_montage_png, cmap='tab20', irng='noscale')
 
         # OPTIONAL: Save intermediate images
         if self._save_intermediates:
@@ -169,28 +197,36 @@ class CBICQC:
             nb.save(rois_nii, self._roi_labels_fname)
 
         # Construct filename dictionary to pass to PDF generator
-        fnames = dict(TempDir=self._work_dir,
-                      ReportPDF=self._report_fname,
+        fnames = dict(WorkDir=self._work_dir,
+                      ReportPDF=self._report_pdf,
                       ROITimeseries=self._roi_ts_png,
+                      ROIPowerspec=self._roi_ps_png,
                       MoparTimeseries=self._mopar_ts_png,
+                      MoparPowerspec=self._mopar_pspec_png,
                       TMeanMontage=self._tmean_montage_png,
                       TSDMontage=self._tsd_montage_png,
+                      ROIsMontage=self._rois_montage_png,
+                      ROIDemeanedTS=self._rois_demeaned_png,
                       TMean=self._tmean_fname,
                       TSD=self._tsd_fname,
-                      ROILabels = self._roi_labels_fname)
+                      ROILabels=self._roi_labels_fname)
 
-        # Generate PDF report
+        # Build PDF report
+        print('  Building PDF')
         ReportPDF(fnames, meta, metrics)
 
-        # Copy final report to derivatives
-        self._save_report(fnames)
-
         # Cleanup temporary QC directory
-        self.cleanup()
+        self.cleanup(skip=True)
 
-    def cleanup(self):
+        return fnames
 
-        shutil.rmtree(self._work_dir)
+    def cleanup(self, skip=False):
+
+        if skip:
+            print('Retaining {}'.format(self._work_dir))
+        else:
+            print('Deleting work directory')
+            shutil.rmtree(self._work_dir)
 
     def _default_metadata(self):
 
@@ -223,64 +259,44 @@ class CBICQC:
 
         return subject, session
 
-    def _qc_metrics(self, fit_results):
-
-        phantom_res = fit_results[0]
-        nyquist_res = fit_results[1]
-        air_res = fit_results[2]
-
-        phantom_a_warm = phantom_res.x[0]
-        phantom_t_warm = phantom_res.x[1]
-        phantom_drift = phantom_res.x[2]
-        phantom_mean = phantom_res.x[3]
-        nyquist_mean = nyquist_res.x[3]
-        noise_mean = air_res.x[3]
-
-        metrics = dict()
-        metrics['PhantomMean'] = phantom_mean
-        metrics['SFNR'] = phantom_mean / noise_mean
-        metrics['SigArtRatio'] = phantom_mean / nyquist_mean
-        metrics['NoiseFloor'] = noise_mean
-        metrics['Drift'] = phantom_drift / phantom_mean * 100
-        metrics['WarmupAmp'] = phantom_a_warm / phantom_mean * 100
-        metrics['WarmupTime'] = phantom_t_warm
-
-        return metrics
-
-    def _moco(self, img_nii):
+    def _moco(self, img_nii, mode='phantom', skip=True):
         """
-        Light wrapper for MCFLIRT (no need to use nipype)
+        Motion correction wrapper
 
-        :param img_nii:
-        :return:
+        :param img_nii: Nifti, image object
+        :param mode: str, QC mode ('phantom' or 'live')
+        :param skip: bool, skip moco flag
+        :return moco_nii: Nifti, motion corrected image object
+        :return moco_pars: array, motion parameter timeseries
         """
 
-        in_fname = os.path.join(self._work_dir, 'qc.nii.gz')
-        out_stub = os.path.join(self._work_dir, 'qc_mcf')
+        if skip:
 
-        nb.save(img_nii, in_fname)
+            moco_nii = img_nii
+            moco_pars = np.zeros([img_nii.shape[3], 6])
 
-        mcflirt_cmd = os.path.join(os.environ['FSLDIR'], 'bin', 'mcflirt')
+        else:
 
-        subprocess.run([mcflirt_cmd, '-in', in_fname, '-out', out_stub, '-meanvol', '-plots'])
+            if 'phantom' in mode:
 
-        moco_nii = nb.load(out_stub + '.nii.gz')
-        moco_pars = np.genfromtxt(out_stub + '.par')
+                moco_nii, moco_pars = moco_phantom(img_nii)
+
+            else:
+
+                moco_nii, moco_pars = moco_live(img_nii, self._work_dir)
 
         return moco_nii, moco_pars
 
-    def _save_report(self, fnames):
+    def _save_report(self, src_pdf, dest_pdf):
 
-        # Save report to derivatives directory
-        report_pdf = os.path.join(self._report_dir, '{}_{}_qc.pdf'.format(self._subject, self._session))
+        if os.path.isfile(dest_pdf):
+            os.remove(dest_pdf)
+        elif os.path.isdir(dest_pdf):
+            shutil.rmtree(dest_pdf)
 
-        if os.path.isfile(report_pdf):
-            os.remove(report_pdf)
-        elif os.path.isdir(report_pdf):
-            shutil.rmtree(report_pdf)
+        print('Saving QC report to {}'.format(dest_pdf))
+        shutil.copyfile(src_pdf, dest_pdf)
 
-        print('Saving QC report to {}'.format(report_pdf))
-        shutil.copyfile(fnames['ReportPDF'], report_pdf)
 
 
 

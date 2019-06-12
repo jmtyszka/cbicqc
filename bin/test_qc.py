@@ -45,6 +45,7 @@ import os
 import sys
 import argparse
 import pkg_resources
+import subprocess
 
 from cbicqc.cbicqc import CBICQC
 
@@ -81,7 +82,10 @@ def main():
     qc = CBICQC(bids_dir, subj_id, sess_id)
 
     # Run analysis
-    qc.run()
+    fnames = qc.run()
+
+    # Open report in Finder
+    os.system('open ' + fnames['ReportPDF'])
 
     # Clean exit
     sys.exit(0)
