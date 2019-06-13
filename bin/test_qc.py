@@ -6,18 +6,6 @@ Authors
 ----
 Mike Tyszka, Caltech Brain Imaging Center
 
-Dates
-----
-2016-08-03 JMT From scratch
-2016-11-04 JMT Add session directory to DICOM heirarchy
-2017-11-09 JMT Added support for DWI, no sessions, IntendedFor and TaskName
-2018-03-09 JMT Fixed IntendedFor handling (#20, #27) and run-number issues (#28)
-               Migrated to pydicom v1.0.1 (note namespace change to pydicom)
-2019-02-25 JMT Fixed arbitrary run ordering (sorted glob)
-2019-03-20 JMT Restructure as PyPI application with BIDS 1.2 compliance
-2019-03-22 JMT Add BIDS validation
-2019-05-20 JMT Port to nipype workflow
-
 MIT License
 
 Copyright (c) 2019 Mike Tyszka
@@ -55,14 +43,16 @@ def main():
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Lightweight daily phantom QC analysis and reporting')
     parser.add_argument('-dir', required=True, help='BIDS QC dataset directory')
-    parser.add_argument('-sub', required=True, help='Subject ID')
-    parser.add_argument('-ses', required=True, help='Session ID')
+    parser.add_argument('-sub', default='', help='Subject ID')
+    parser.add_argument('-ses', default='', help='Session ID')
+    parser.add_argument('-summary', dest='summary', action='store_true', help='Generate QC summary for all sessions')
 
     # Parse command line arguments
     args = parser.parse_args()
     bids_dir = os.path.realpath(args.dir)
     subj_id = args.sub
     sess_id = args.ses
+    summarize = args.summary
 
     # Read version from setup.py
     ver = pkg_resources.get_distribution('cbicqc').version
@@ -79,13 +69,10 @@ def main():
     print('Session : {}'.format(sess_id))
 
     # Setup QC analysis
-    qc = CBICQC(bids_dir, subj_id, sess_id)
+    qc = CBICQC(bids_dir, subj_id, sess_id, summarize)
 
     # Run analysis
-    fnames = qc.run()
-
-    # Open report in Finder
-    os.system('open ' + fnames['ReportPDF'])
+    qc.run()
 
     # Clean exit
     sys.exit(0)

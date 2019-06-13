@@ -58,11 +58,12 @@ from .report import ReportPDF
 
 class CBICQC:
 
-    def __init__(self, bids_dir, subject, session):
+    def __init__(self, bids_dir, subject='', session='', summarize=False):
 
         self._bids_dir = bids_dir
         self._subject = subject
         self._session = session
+        self._do_summary = summarize
 
         # Create work and report directories
         self._work_dir = tempfile.mkdtemp()
@@ -70,7 +71,6 @@ class CBICQC:
         os.makedirs(self._report_dir, exist_ok=True)
 
         # Intermediate filenames
-        self._report_pdf = os.path.join(self._report_dir, '{}_{}_qc.pdf'.format(self._subject, self._session))
         self._tmean_fname = os.path.join(self._work_dir, 'tmean.nii.gz')
         self._tsd_fname = os.path.join(self._work_dir, 'tsd.nii.gz')
         self._roi_labels_fname = os.path.join(self._work_dir, 'roi_labels.nii.gz')
@@ -90,6 +90,7 @@ class CBICQC:
 
         print('')
         print('Starting CBIC QC analysis')
+        print('')
 
         # Get BIDS layout
         # Index BIDS directory
@@ -97,134 +98,145 @@ class CBICQC:
                             absolute_paths=True,
                             ignore=['work', 'derivatives', 'exclude'])
 
-        # Get first QC image for this subject/session
-        img_list = layout.get(subject=self._subject,
-                              session=self._session,
-                              suffix='T2star',
-                              extensions=['nii', 'nii.gz'],
-                              return_type='file')
-        if not img_list:
-            print('* No QC images found for subject {} session {} - exiting'.
-                  format(self._subject, self._session))
-            sys.exit(1)
+        # Get complete subject list
+        if self._subject:
+            subject_list = [self._subject]
+        else:
+            subject_list = layout.get_subjects()
 
-        qc_img_fname = img_list[0]
-        qc_meta_fname = qc_img_fname.replace('.nii.gz', '.json')
+        for this_subject in subject_list:
 
-        # Load 4D QC phantom image
-        print('  Loading QC timeseries image')
-        qc_nii = nb.load(qc_img_fname)
+            print('  Subject {}'.format(this_subject))
 
-        # Load metadata if available
-        print('  Loading QC metadata')
-        try:
-            with open(qc_meta_fname, 'r') as fd:
-                meta = json.load(fd)
-        except IOError:
-            print('* Could not open image metadata {}'.format(qc_meta_fname))
-            print('* Using default imaging parameters')
-            meta = self._default_metadata()
+            if self._session:
+                session_list = [self._session]
+            else:
+                session_list = layout.get_sessions(subject=this_subject)
 
-        # Integrate additional meta data from Nifti header and filename
-        meta['Subject'] = self._subject
-        meta['Session'] = self._session
-        meta['VoxelSize'] = ' x '.join(str(x) for x in qc_nii.header.get('pixdim')[1:4])
-        meta['MatrixSize'] = ' x '.join(str(x) for x in qc_nii.shape)
+            for this_session in session_list:
 
-        # Perform rigid body motion correction on QC series
-        print('  Starting motion correction')
-        t0 = dt.datetime.now()
+                print('    Session {}'.format(this_session))
 
-        qc_moco_nii, qc_moco_pars = self._moco(qc_nii, skip=False)
+                # Get first QC image for this subject/session
+                img_list = layout.get(subject=this_subject,
+                                      session=this_session,
+                                      suffix='T2star',
+                                      extensions=['nii', 'nii.gz'],
+                                      return_type='file')
+                if not img_list:
+                    print('    * No QC images found for subject {} session {} - exiting'.
+                          format(self._subject, self._session))
+                    sys.exit(1)
 
-        t1 = dt.datetime.now()
-        print('  Completed motion correction in {} seconds'.format((t1-t0).seconds))
+                qc_img_fname = img_list[0]
+                qc_meta_fname = qc_img_fname.replace('.nii.gz', '.json')
 
-        # Temporal mean and sd images
-        print('  Calculating temporal mean image')
-        tmean_nii, tsd_nii, tsfnr_nii = temporal_mean_sd(qc_moco_nii)
+                # Load 4D QC phantom image
+                print('      Loading QC timeseries image')
+                qc_nii = nb.load(qc_img_fname)
 
-        # Create ROI labels
-        print('  Constructing ROI labels')
-        rois_nii = roi_labels(tmean_nii)
+                # Load metadata if available
+                print('      Loading QC metadata')
+                try:
+                    with open(qc_meta_fname, 'r') as fd:
+                        meta = json.load(fd)
+                except IOError:
+                    print('      * Could not open image metadata {}'.format(qc_meta_fname))
+                    print('      * Using default imaging parameters')
+                    meta = self._default_metadata()
 
-        # Extract ROI time series
-        print('  Extracting ROI time series')
-        s_mean_t = extract_timeseries(qc_moco_nii, rois_nii)
+                # Integrate additional meta data from Nifti header and filename
+                meta['Subject'] = this_subject
+                meta['Session'] = this_session
+                meta['VoxelSize'] = ' x '.join(str(x) for x in qc_nii.header.get('pixdim')[1:4])
+                meta['MatrixSize'] = ' x '.join(str(x) for x in qc_nii.shape)
 
-        # Detrend time series
-        print('  Detrending time series')
-        fit_results, s_detrend_t = detrend_timeseries(s_mean_t)
+                # Perform rigid body motion correction on QC series
+                print('      Starting motion correction')
+                t0 = dt.datetime.now()
 
-        # Calculate QC metrics
-        metrics = qc_metrics(fit_results, tsfnr_nii, rois_nii)
+                qc_moco_nii, qc_moco_pars = self._moco(qc_nii, skip=True)
 
-        # Time vector (seconds)
-        t = np.arange(0, s_mean_t.shape[1]) * meta['RepetitionTime']
+                t1 = dt.datetime.now()
+                print('      Completed motion correction in {} seconds'.format((t1-t0).seconds))
 
-        #
-        # Generate PDF Report
-        #
+                # Temporal mean and sd images
+                print('      Calculating temporal mean image')
+                tmean_nii, tsd_nii, tsfnr_nii = temporal_mean_sd(qc_moco_nii)
 
-        print('')
-        print('Generating Report')
+                # Create ROI labels
+                print('      Constructing ROI labels')
+                rois_nii = roi_labels(tmean_nii)
 
-        # Create report images
-        print('  Creating report images')
+                # Extract ROI time series
+                print('      Extracting ROI time series')
+                s_mean_t = extract_timeseries(qc_moco_nii, rois_nii)
 
-        print('    ROI Timeseries')
-        plot_roi_timeseries(t, s_mean_t, s_detrend_t, self._roi_ts_png)
-        plot_roi_powerspec(t, s_detrend_t, self._roi_ps_png)
+                # Detrend time series
+                print('      Detrending time series')
+                fit_results, s_detrend_t = detrend_timeseries(s_mean_t)
 
-        print('    Motion Timeseries')
-        plot_mopar_timeseries(t, qc_moco_pars, self._mopar_ts_png)
-        plot_mopar_powerspec(t, qc_moco_pars, self._mopar_pspec_png)
+                # Calculate QC metrics
+                metrics = qc_metrics(fit_results, tsfnr_nii, rois_nii)
 
-        print('    ROI Residuals')
-        roi_demeaned_ts(qc_moco_nii, rois_nii, self._rois_demeaned_png)
+                # Time vector (seconds)
+                t = np.arange(0, s_mean_t.shape[1]) * meta['RepetitionTime']
 
-        print('    Orthoslices')
-        orthoslices(tmean_nii, self._tmean_montage_png, cmap='gray', irng='robust')
-        orthoslices(tsd_nii, self._tsd_montage_png, cmap='viridis', irng='robust')
-        orthoslices(rois_nii, self._rois_montage_png, cmap='tab20', irng='noscale')
+                #
+                # Generate PDF Report
+                #
 
-        # OPTIONAL: Save intermediate images
-        if self._save_intermediates:
+                print('      Generating Report')
 
-            print('  Saving intermediate images')
-            nb.save(tmean_nii, self._tmean_fname)
-            nb.save(tsd_nii, self._tsd_fname)
-            nb.save(rois_nii, self._roi_labels_fname)
+                # Create report images
+                plot_roi_timeseries(t, s_mean_t, s_detrend_t, self._roi_ts_png)
+                plot_roi_powerspec(t, s_detrend_t, self._roi_ps_png)
+                plot_mopar_timeseries(t, qc_moco_pars, self._mopar_ts_png)
+                plot_mopar_powerspec(t, qc_moco_pars, self._mopar_pspec_png)
+                roi_demeaned_ts(qc_moco_nii, rois_nii, self._rois_demeaned_png)
+                orthoslices(tmean_nii, self._tmean_montage_png, cmap='gray', irng='robust')
+                orthoslices(tsd_nii, self._tsd_montage_png, cmap='viridis', irng='robust')
+                orthoslices(rois_nii, self._rois_montage_png, cmap='tab20', irng='noscale')
 
-        # Construct filename dictionary to pass to PDF generator
-        fnames = dict(WorkDir=self._work_dir,
-                      ReportPDF=self._report_pdf,
-                      ROITimeseries=self._roi_ts_png,
-                      ROIPowerspec=self._roi_ps_png,
-                      MoparTimeseries=self._mopar_ts_png,
-                      MoparPowerspec=self._mopar_pspec_png,
-                      TMeanMontage=self._tmean_montage_png,
-                      TSDMontage=self._tsd_montage_png,
-                      ROIsMontage=self._rois_montage_png,
-                      ROIDemeanedTS=self._rois_demeaned_png,
-                      TMean=self._tmean_fname,
-                      TSD=self._tsd_fname,
-                      ROILabels=self._roi_labels_fname)
+                # OPTIONAL: Save intermediate images
+                if self._save_intermediates:
+                    nb.save(tmean_nii, self._tmean_fname)
+                    nb.save(tsd_nii, self._tsd_fname)
+                    nb.save(rois_nii, self._roi_labels_fname)
 
-        # Build PDF report
-        print('  Building PDF')
-        ReportPDF(fnames, meta, metrics)
+                # Output PDF and JSON filenames
+                self._report_pdf = os.path.join(self._report_dir, '{}_{}_qc.pdf'.format(this_subject, this_session))
+                self._report_json = self._report_pdf.replace('.pdf', '.json')
+
+                # Construct filename dictionary to pass to PDF generator
+                fnames = dict(WorkDir=self._work_dir,
+                              ReportPDF=self._report_pdf,
+                              ReportJSON=self._report_json,
+                              ROITimeseries=self._roi_ts_png,
+                              ROIPowerspec=self._roi_ps_png,
+                              MoparTimeseries=self._mopar_ts_png,
+                              MoparPowerspec=self._mopar_pspec_png,
+                              TMeanMontage=self._tmean_montage_png,
+                              TSDMontage=self._tsd_montage_png,
+                              ROIsMontage=self._rois_montage_png,
+                              ROIDemeanedTS=self._rois_demeaned_png,
+                              TMean=self._tmean_fname,
+                              TSD=self._tsd_fname,
+                              ROILabels=self._roi_labels_fname)
+
+                # Build PDF report
+                ReportPDF(fnames, meta, metrics)
 
         # Cleanup temporary QC directory
-        self.cleanup(skip=True)
-
-        return fnames
+        self.cleanup()
 
     def cleanup(self, skip=False):
 
         if skip:
+            print('')
             print('Retaining {}'.format(self._work_dir))
         else:
+            print('')
             print('Deleting work directory')
             shutil.rmtree(self._work_dir)
 

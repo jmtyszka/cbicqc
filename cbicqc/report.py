@@ -38,6 +38,7 @@ SOFTWARE.
 """
 
 import os
+import json
 import shutil
 import datetime as dt
 
@@ -318,6 +319,11 @@ class ReportPDF:
 
     def _save_report(self):
 
+        # Copy report PDF to derivatives
         shutil.copyfile(self._tmp_report_pdf, self._fnames['ReportPDF'])
+
+        # Save metrics in derivatives as JSON file
+        with open(self._fnames['ReportJSON'], 'w') as fd:
+            json.dump(self._metrics, fd, sort_keys=True, indent=4)
 
 

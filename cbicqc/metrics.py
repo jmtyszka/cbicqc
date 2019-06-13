@@ -92,13 +92,15 @@ def spike_count(points, thresh=3.5):
 
     modified_z_score = 0.6745 * dev / mad
 
-    return np.sum(modified_z_score > thresh)
+    # Cast to int to prevent JSON encoding errors later
+    return int(np.sum(modified_z_score > thresh))
 
 
 def calc_tsfnr(tsfnr_nii, rois_nii):
 
     tsfnr_img = tsfnr_nii.get_data()
     rois_img = rois_nii.get_data()
+
 
     return np.mean(tsfnr_img[rois_img == 1])
 

@@ -26,7 +26,6 @@ Copyright 2019 California Institute of Technology.
 
 import numpy as np
 from scipy.optimize import least_squares
-from scipy.signal import medfilt
 import nibabel as nb
 
 
@@ -35,7 +34,7 @@ def temporal_mean_sd(qc_moco_nii):
     # Temporal mean of 4D timeseries
     tmean = np.mean(qc_moco_nii.get_data(), axis=3)
     tsd = np.std(qc_moco_nii.get_data(), axis=3)
-    tsfnr = tmean / tsd
+    tsfnr = tmean / (tsd + np.finfo(float).eps)
 
     tmean_nii = nb.Nifti1Image(tmean, qc_moco_nii.affine)
     tsd_nii = nb.Nifti1Image(tsd, qc_moco_nii.affine)

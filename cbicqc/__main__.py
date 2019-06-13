@@ -6,18 +6,6 @@ Authors
 ----
 Mike Tyszka, Caltech Brain Imaging Center
 
-Dates
-----
-2016-08-03 JMT From scratch
-2016-11-04 JMT Add session directory to DICOM heirarchy
-2017-11-09 JMT Added support for DWI, no sessions, IntendedFor and TaskName
-2018-03-09 JMT Fixed IntendedFor handling (#20, #27) and run-number issues (#28)
-               Migrated to pydicom v1.0.1 (note namespace change to pydicom)
-2019-02-25 JMT Fixed arbitrary run ordering (sorted glob)
-2019-03-20 JMT Restructure as PyPI application with BIDS 1.2 compliance
-2019-03-22 JMT Add BIDS validation
-2019-05-20 JMT Port to nipype workflow
-
 MIT License
 
 Copyright (c) 2019 Mike Tyszka
