@@ -1,107 +1,175 @@
-#!/usr/bin/env python
-#
-# Generate top level HTML report page for all scanners
-#
-# AUTHOR : Mike Tyszka, Ph.D.
-# DATES  : 2014-03-11 JMT Adapt from cbicqc_report_scanner.py
-#
-# This file is part of CBICQC.
-#
-#    CBICQC is free software: you can redistribute it and/or modify
-#    it under the terms of the GNU General Public License as published by
-#    the Free Software Foundation, either version 3 of the License, or
-#    (at your option) any later version.
-#
-#    CBICQC is distributed in the hope that it will be useful,
-#    but WITHOUT ANY WARRANTY; without even the implied warranty of
-#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#    GNU General Public License for more details.
-#
-#    You should have received a copy of the GNU General Public License
-#   along with CBICQC.  If not, see <http://www.gnu.org/licenses/>.
-#
-# Copyright 2014 California Institute of Technology.
+#!/usr/bin/env python3
+"""
+Create summary PDF report
 
-import sys
+AUTHORS
+----
+Mike Tyszka, Ph.D., Caltech Brain Imaging Center
+
+MIT License
+
+Copyright (c) 2019 Mike Tyszka
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+"""
+
 import os
-import string
-import numpy as np
-from matplotlib.pyplot import *
+import shutil
+import tempfile
 from datetime import datetime
-from dateutil.relativedelta import relativedelta
 
-# Define HTML boilerplate sections
-HTML_HEADER = """
-<html>
-<head>
-<STYLE TYPE="text/css">
-BODY {
-  font-family    : sans-serif;
-}
-td {
-  padding-left   : 10px;
-  padding-right  : 10px;
-  padding-top    : 0px;
-  padding-bottom : 0px;
-  vertical-align : top;
-}
-</STYLE>
-</head>
-<body>
-<h1 style="background-color:#E0E0FF">CBIC QC Home Page</h1>
-"""
+import matplotlib.pyplot as plt
+import numpy as np
+from reportlab.lib.enums import TA_JUSTIFY
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.platypus import (SimpleDocTemplate,
+                                Paragraph,
+                                Spacer,
+                                Image,
+                                Table)
 
-HTML_FOOTER = """
-</body>
-</html>
-"""
-
-# Main function
-def main():
-
-  # Get root QC data directory from shell environment
-  cbicqc_data_dir = os.environ['CBICQC_DATA']
-
-  print('----------------')
-  print('Creating top level page for all scanners')
-
-  # Home page filename
-  qc_home_page = os.path.join(cbicqc_data_dir, 'index.html')
-  print('Writing home page to ' + qc_home_page)
-
-  # Open home page to write
-  fd = open(qc_home_page, "w")
-  
-  # Write HTML header
-  fd.write(HTML_HEADER)
-  
-  # Start table
-  fd.write('<table><tr><td>Scanner Name<td>QC Calendar<td>QC Trends</tr>')
-  
-  # Loop over all scanner QC directories within the CBICQC data directory
-  for scanner_name in os.listdir(cbicqc_data_dir):
-  
-    # Full path to scanner QC directory
-    scanner_qc_dir = os.path.join(cbicqc_data_dir, scanner_name)
-    
-    # Daily QC directory
-    if os.path.isdir(scanner_qc_dir):
-    
-      # Report URLs
-      qc_cal_url = os.path.join(scanner_name,'index.html')
-      qc_trends_url = os.path.join(scanner_name,'trends.html')
-    
-      # Write table row for this scanner
-      fd.write('<tr>')
-      fd.write('<td>%s' %(scanner_name))
-      fd.write('<td><a href="%s">Calendar</a>' %(qc_cal_url))
-      fd.write('<td><a href="%s">Trends</a>' %(qc_trends_url))
-      fd.write('</tr>')
-
-  # Finish off page with footer
-  fd.write(HTML_FOOTER)
+from .graphics import trend_subplot
 
 
-# This is the standard boilerplate that calls the main() function.
-if __name__ == '__main__':
-    main()
+class SummaryPDF:
+
+    def __init__(self, report_dir, metrics):
+        """
+        Construct summary report PDF
+
+        :param report_dir: str, report output directory in derivatives
+        :param metrics: list, session metric dictionaries including metadata
+        """
+
+        self._report_dir = report_dir
+        self._metrics = metrics
+        self._subject = metrics[0]['Subject']
+        self._summary_pdf = os.path.join(report_dir, '{}_summary.pdf'.format(self._subject))
+
+        # Create working directory for images
+        self._work_dir = tempfile.mkdtemp()
+
+        # Contents - list of flowables to be built into a document
+        self._contents = []
+
+        # Add a justified paragraph style
+        self._pstyles = getSampleStyleSheet()
+        self._pstyles.add(ParagraphStyle(name='Justify', alignment=TA_JUSTIFY))
+
+        self._init_pdf()
+        self._add_coverpage()
+        self._add_metric_trends()
+
+        self._doc.build(self._contents)
+
+        # Delete working directory
+        shutil.rmtree(self._work_dir)
+
+    def _add_metric_trends(self):
+
+        metric_list = [
+            'SNR',
+            'SFNR',
+            'Drift',
+            'NyquistSpikes',
+            'AirSpikes'
+        ]
+
+        trend_png_fname = self._plot_trends(metric_list)
+
+        ptext = '<font size=14><b>Session Metric Trends</b></font>'
+        self._contents.append(Paragraph(ptext, self._pstyles['Justify']))
+        self._contents.append(Spacer(1, 0.25 * inch))
+
+        trends_img = Image(trend_png_fname, 6.0 * inch, 6.0 * inch, hAlign='LEFT')
+        self._contents.append(trends_img)
+
+    def _init_pdf(self):
+
+        # Create a new PDF document
+        self._doc = SimpleDocTemplate(self._summary_pdf,
+                                      pagesize=letter,
+                                      rightMargin=0.5 * inch,
+                                      leftMargin=0.5 * inch,
+                                      topMargin=0.5 * inch,
+                                      bottomMargin=0.5 * inch)
+
+    def _add_coverpage(self):
+
+        ptext = '<font size=24>CBIC Quality Control Summary</font>'
+        self._contents.append(Paragraph(ptext, self._pstyles['Justify']))
+        self._contents.append(Spacer(1, 0.5 * inch))
+
+        timestamp = datetime.now().strftime('%Y-%m-%d at %H:%M:%S')
+        ptext = '<font size=12>Generated by CBICQC on {}</font>'.format(timestamp)
+        self._contents.append(Paragraph(ptext, self._pstyles['Justify']))
+        self._contents.append(Spacer(1, 0.25 * inch))
+
+        ptext = '<font size=14><b>Subject Details</b></font>'
+        self._contents.append(Paragraph(ptext, self._pstyles['Justify']))
+        self._contents.append(Spacer(1, 0.1 * inch))
+
+        # First session metadata - assume identical for all sessions
+        m = self._metrics[0]
+
+        meta = [['Subject', self._subject],
+                ['Scanner', m['StationName'] + ' ' + m['DeviceSerialNumber']],
+                ['Software Version', m['SoftwareVersions']],
+                ['Coil Name', m['ReceiveCoilName']]]
+
+        self._contents.append(Table(meta, hAlign='LEFT'))
+        self._contents.append(Spacer(1, 0.25 * inch))
+
+    def _plot_trends(self, metric_list):
+
+        nm = len(metric_list)
+
+        t = []
+        mm = []
+
+        for mt in self._metrics:
+            dt = datetime.strptime(mt['AcquisitionDateTime'], '%Y-%m-%dT%H:%M:%S.%f')
+            t.append(dt)
+            mm.append([mt[m_name] for m_name in metric_list])
+
+        t, mm = np.array(t), np.array(mm)
+
+        png_fname = os.path.join(self._work_dir, 'metric_trends.png')
+
+        plt.subplots(nm, 1, figsize=(7, 7))
+
+        for mc, m_name in enumerate(metric_list):
+
+            plt.subplot(nm, 1, mc+1)
+            trend_subplot(m_name, t, mm[:, mc])
+
+        # Add time axis label to final subplot
+        plt.xlabel('Date')
+
+        plt.subplots_adjust(bottom=0.0, top=0.9, left=0.0, right=1.0)
+
+        # Remove excess space
+        plt.tight_layout()
+
+        # Save plot to file
+        plt.savefig(png_fname, dpi=300)
+
+        return png_fname

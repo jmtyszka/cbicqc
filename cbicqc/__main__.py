@@ -33,23 +33,28 @@ import os
 import sys
 import argparse
 import pkg_resources
+import subprocess
 
-from .cbicqc import CBICQC
+from cbicqc.cbicqc import CBICQC
 
 
 def main():
 
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Lightweight daily phantom QC analysis and reporting')
-    parser.add_argument('-dir', required=True, help='BIDS QC dataset directory')
-    parser.add_argument('-sub', required=True, help='Subject ID')
-    parser.add_argument('-ses', required=True, help='Session ID')
+    parser.add_argument('-dir', default='.', help='BIDS QC dataset directory')
+    parser.add_argument('-sub', default='', help='Subject ID')
+    parser.add_argument('-ses', default='', help='Session ID')
+    parser.add_argument('-mode', default='phantom', help="QC Mode ('phantom' or 'live')")
+    parser.add_argument('-summary', action='store_true', help='Generate QC summary for all sessions')
 
     # Parse command line arguments
     args = parser.parse_args()
     bids_dir = os.path.realpath(args.dir)
     subj_id = args.sub
     sess_id = args.ses
+    mode = args.mode
+    summary = args.summary
 
     # Read version from setup.py
     ver = pkg_resources.get_distribution('cbicqc').version
@@ -62,11 +67,16 @@ def main():
     print('Version : {}'.format(ver))
     print('')
     print('BIDS Directory : {}'.format(bids_dir))
-    print('Subject : {}'.format(subj_id))
-    print('Session : {}'.format(sess_id))
+
+    print('Subject : {}'.format(subj_id if len(subj_id) > 0 else 'All Subjects'))
+
+    if summary:
+        print('Summarizing All Sessions')
+    else:
+        print('Session : {}'.format(sess_id if len(sess_id) > 0 else 'All Sessions'))
 
     # Setup QC analysis
-    qc = CBICQC(bids_dir, subj_id, sess_id)
+    qc = CBICQC(bids_dir=bids_dir, subject=subj_id, session=sess_id, mode=mode, summary=summary)
 
     # Run analysis
     qc.run()

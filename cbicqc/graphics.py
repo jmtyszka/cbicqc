@@ -24,9 +24,9 @@ This file is part of CBICQC.
 Copyright 2019 California Institute of Technology.
 """
 
-import os
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 from scipy.signal import periodogram
 from skimage.util import montage
 from skimage.exposure import rescale_intensity
@@ -358,3 +358,29 @@ def roi_demeaned_ts(img_nii, rois_nii, residuals_fname):
 
     # Save plot to file
     plt.savefig(residuals_fname, dpi=300)
+
+
+def trend_subplot(m_name, t, m):
+    """
+    Plot session metric trend with median, 5th and 95th percentiles
+
+    :param t: datetime, session datetime
+    :param m: array, metric trend
+    :return:
+    """
+
+    t0, t1 = np.min(t), np.max(t)
+    p5, p50, p95 = np.percentile(m, (5, 50, 95))
+
+    plt.gca().xaxis.set_major_locator(mdates.MonthLocator())
+    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%b'))
+
+    plt.plot([t0, t1], [p5, p5], 'g:')
+    plt.plot([t0, t1], [p50, p50], 'g')
+    plt.plot([t0, t1], [p95, p95], 'g:')
+
+    plt.plot(t, m, 'or')
+
+    plt.gcf().autofmt_xdate()
+    plt.title(m_name, loc='left')
+
