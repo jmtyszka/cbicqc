@@ -183,6 +183,9 @@ setup(
     # In this case, 'data_file' will be installed into '<sys.prefix>/my_data'
     # data_files=[('my_data', ['data/data_file'])],  # Optional
 
+    # Utility scripts will be installed to /opt/local/Library/Frameworks/Python.framework/Versions/3.7/bin or equivalent
+    scripts=['bin/setup_sourcedata'],
+
     # To provide executable scripts, use entry points in preference to the
     # "scripts" keyword. Entry points provide cross-platform support and allow
     # `pip` to create the appropriate form of executable for the target

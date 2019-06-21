@@ -68,6 +68,9 @@ class CBICQC:
         self._mode = mode
         self._summary = summary
 
+        # Phantom or in vivo suffix ('T2star' or 'bold')
+        self._suffix = 'T2star' if 'phantom' in mode else 'bold'
+
         # Batch subject/session ids
         self._this_subject = ''
         self._this_session = ''
@@ -165,7 +168,7 @@ class CBICQC:
                                     extensions=['nii', 'nii.gz'],
                                     subject=self._this_subject,
                                     session=self._this_session,
-                                    suffix='T2star')
+                                    suffix=self._suffix)
         if not img_list:
             print('    * No QC images found for subject {} session {} - exiting'.
                   format(self._this_subject, self._this_session))
@@ -195,7 +198,7 @@ class CBICQC:
         meta['MatrixSize'] = ' x '.join(str(x) for x in qc_nii.shape)
 
         # Perform rigid body motion correction on QC series
-        print('      Starting motion correction')
+        print('      Starting {} motion correction'.format(self._mode))
         t0 = dt.datetime.now()
 
         qc_moco_nii, qc_moco_pars = self._moco(qc_nii)
@@ -275,12 +278,11 @@ class CBICQC:
             print('Deleting work directory')
             shutil.rmtree(self._work_dir)
 
-    def _moco(self, img_nii, mode='phantom', skip=False):
+    def _moco(self, img_nii, skip=False):
         """
         Motion correction wrapper
 
         :param img_nii: Nifti, image object
-        :param mode: str, QC mode ('phantom' or 'live')
         :param skip: bool, skip moco flag
         :return moco_nii: Nifti, motion corrected image object
         :return moco_pars: array, motion parameter timeseries
@@ -293,13 +295,18 @@ class CBICQC:
 
         else:
 
-            if 'phantom' in mode:
+            if 'phantom' in self._mode:
 
                 moco_nii, moco_pars = moco_phantom(img_nii)
 
-            else:
+            elif 'live' in self._mode:
 
                 moco_nii, moco_pars = moco_live(img_nii, self._work_dir)
+
+            else:
+
+                print('      * Unknown QC mode ({})'.format(self._mode))
+                sys.exit(1)
 
         return moco_nii, moco_pars
 

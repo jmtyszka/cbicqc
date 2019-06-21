@@ -42,11 +42,11 @@ def main():
 
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Lightweight daily phantom QC analysis and reporting')
-    parser.add_argument('-dir', default='.', help='BIDS QC dataset directory')
-    parser.add_argument('-sub', default='', help='Subject ID')
-    parser.add_argument('-ses', default='', help='Session ID')
-    parser.add_argument('-mode', default='phantom', help="QC Mode ('phantom' or 'live')")
-    parser.add_argument('-summary', action='store_true', help='Generate QC summary for all sessions')
+    parser.add_argument('-d', '--dir', default='.', help='BIDS QC dataset directory')
+    parser.add_argument('-m', '--mode', default='phantom', help="QC Mode (phantom or live)")
+    parser.add_argument('-s', '--summary', action='store_true', help='Generate QC summary for all sessions')
+    parser.add_argument('--sub', default='', help='Subject ID')
+    parser.add_argument('--ses', default='', help='Session ID')
 
     # Parse command line arguments
     args = parser.parse_args()
@@ -87,4 +87,5 @@ def main():
 
 # This is the standard boilerplate that calls the main() function.
 if __name__ == '__main__':
+
     main()

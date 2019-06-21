@@ -141,7 +141,7 @@ class ReportPDF:
         self._contents.append(Paragraph(ptext, self._pstyles['Justify']))
         self._contents.append(Spacer(1, 0.25 * inch))
 
-        signal_metrics = [['Mean Signal', '{:.1f}'.format(self._metrics['PhantomMean'])],
+        signal_metrics = [['Mean Signal', '{:.1f}'.format(self._metrics['SignalMean'])],
                           ['SNR', '{:.1f}'.format(self._metrics['SNR'])],
                           ['SFNR', '{:.1f}'.format(self._metrics['SFNR'])],
                           ['SArtR', '{:.1f}'.format(self._metrics['SArtR'])],
@@ -150,7 +150,7 @@ class ReportPDF:
                           ['Warmup Time Constant', '{:.1f} TRs'.format(self._metrics['WarmupTime'])]
                           ]
 
-        ptext = '<font size=11><b>Phantom Signal</b></font>'
+        ptext = '<font size=11><b>Main Signal</b></font>'
         self._contents.append(Paragraph(ptext, self._pstyles['Justify']))
         self._contents.append(Spacer(1, 0.1 * inch))
 
@@ -160,7 +160,7 @@ class ReportPDF:
 
         noise_metrics = [['Noise Sigma', '{:.1f}'.format(self._metrics['NoiseSigma'])],
                          ['Noise Floor', '{:.1f}'.format(self._metrics['NoiseFloor'])],
-                         ['Phantom Spikes', '{}'.format(self._metrics['PhantomSpikes'])],
+                         ['Signal Spikes', '{}'.format(self._metrics['SignalSpikes'])],
                          ['Nyquist Ghost Spikes', '{}'.format(self._metrics['NyquistSpikes'])],
                          ['Air Spikes', '{}'.format(self._metrics['AirSpikes'])],
                          ]
@@ -188,7 +188,7 @@ class ReportPDF:
 
         ptext = """
         <font size=11>
-        These three graphs show the spatial mean signal intensity within the phantom, Nyquist ghost and air
+        These three graphs show the spatial mean signal intensity within the main signal, Nyquist ghost and air
         space regions of interest (ROIs). The blue line is the raw spatial mean intensity and the orange line
         has been detrended with an exponential + linear model. 
         </font>
@@ -236,7 +236,7 @@ class ReportPDF:
         self._contents.append(Paragraph(ptext, self._pstyles['Justify']))
         self._contents.append(Spacer(1, 0.25 * inch))
 
-        # Phantom QC specific text
+        # Main signal QC specific text
         ptext = """
         <font size=11>
         Displacement and rotation parameter timecourses required

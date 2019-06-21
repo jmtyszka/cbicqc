@@ -39,26 +39,26 @@ def qc_metrics(fit_results, tsfnr_nii, rois_nii):
     # EMI analysis with zipper identification
     # Coil element SNR and fluctuation analysis
 
-    phantom_a_warm = fit_results[0].x[0]
-    phantom_t_warm = fit_results[0].x[1]
-    phantom_drift = fit_results[0].x[2]
-    phantom_mean = fit_results[0].x[3]
+    signal_a_warm = fit_results[0].x[0]
+    signal_t_warm = fit_results[0].x[1]
+    signal_drift = fit_results[0].x[2]
+    signal_mean = fit_results[0].x[3]
     nyquist_mean = fit_results[1].x[3]
     noise_mean = fit_results[2].x[3]
 
-    # Calculate Phantom tSFNR
+    # Calculate main signal tSFNR
     tsfnr = calc_tsfnr(tsfnr_nii, rois_nii)
 
     # Create and fill dictionary of QC metrics
     metrics = dict()
 
-    metrics['PhantomMean'] = phantom_mean
-    metrics['SNR'] = phantom_mean / noise_mean
+    metrics['SignalMean'] = signal_mean
+    metrics['SNR'] = signal_mean / noise_mean
     metrics['SFNR'] = tsfnr
-    metrics['SArtR'] = phantom_mean / nyquist_mean
-    metrics['Drift'] = phantom_drift / phantom_mean * 100
-    metrics['WarmupAmp'] = phantom_a_warm / phantom_mean * 100
-    metrics['WarmupTime'] = phantom_t_warm
+    metrics['SArtR'] = signal_mean / nyquist_mean
+    metrics['Drift'] = signal_drift / signal_mean * 100
+    metrics['WarmupAmp'] = signal_a_warm / signal_mean * 100
+    metrics['WarmupTime'] = signal_t_warm
 
     # SNR relative to mean noise
     # Estimate spatial noise sigma (assuming underlying Gaussian and Half-Normal distribution)
@@ -67,7 +67,7 @@ def qc_metrics(fit_results, tsfnr_nii, rois_nii):
 
     metrics['NoiseSigma'] = noise_mean * np.sqrt(np.pi/2)
     metrics['NoiseFloor'] = noise_mean
-    metrics['PhantomSpikes'] = spike_count(fit_results[0].fun)
+    metrics['SignalSpikes'] = spike_count(fit_results[0].fun)
     metrics['NyquistSpikes'] = spike_count(fit_results[1].fun)
     metrics['AirSpikes'] = spike_count(fit_results[2].fun)
 

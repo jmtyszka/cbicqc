@@ -35,6 +35,7 @@ import tempfile
 from datetime import datetime
 
 import matplotlib.pyplot as plt
+from pandas.plotting import register_matplotlib_converters
 import numpy as np
 from reportlab.lib.enums import TA_JUSTIFY
 from reportlab.lib.pagesizes import letter
@@ -58,6 +59,9 @@ class SummaryPDF:
         :param report_dir: str, report output directory in derivatives
         :param metrics: list, session metric dictionaries including metadata
         """
+
+        # For datetime axis labeling without warnings
+        register_matplotlib_converters()
 
         self._report_dir = report_dir
         self._metrics = metrics
