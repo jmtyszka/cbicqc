@@ -30,6 +30,8 @@ SOFTWARE.
 """
 
 import os
+import subprocess
+import importlib.resources as ir
 import nibabel as nb
 import numpy as np
 from skimage.filters import threshold_otsu
@@ -37,6 +39,50 @@ from scipy.ndimage.morphology import (binary_dilation,
                                       binary_erosion,
                                       generate_binary_structure,
                                       iterate_structure)
+
+
+
+def register_template(tmean_nii, work_dir, mode='phantom'):
+    """
+    Register the appropriate template to the provided tmean image
+    - for phantom QC, a translation-only registration is performed
+    - for in vivo QC, an affine registration is performed
+
+    :param tmean_nii: Nifti object,
+        Temporal mean image
+    :param work_dir: str,
+        Full path to working directory
+    :param mode: str,
+        QC mode, 'phantom' or 'live'
+    :return:
+    """
+
+    # Save temporal mean image for use by FLIRT
+    tmean_fname = os.path.join(work_dir, 'fixed.nii.gz')
+    nb.save(tmean_nii, tmean_fname)
+
+    # Link appropriate template for mode
+    if 'phantom' in mode:
+        in_fname = ir.path('cbicqc', 'fbirn_sphere.nii.gz')
+        dof = 6
+    else:
+        in_fname = ir.path('cbicqc', 'mni_icbm152_t1_tal_nlin_sym_09c.nii')
+        dof = 12
+
+    out_fname = os.path.join(work_dir, 'registered_template.nii.gz')
+
+    flirt_cmd = os.path.join(os.environ['FSLDIR'], 'bin', 'flirt')
+    subprocess.run([flirt_cmd,
+                    '-in', in_fname,
+                    '-ref', tmean_nii,
+                    '-out', out_fname,
+                    '-dof', dof])
+
+    # Load motion corrected QC timeseries
+    # moco_nii = nb.load(out_stub + '.nii.gz')
+    # moco_pars = np.genfromtxt(out_stub + '.par')
+
+    return
 
 
 def roi_labels(tmean_nii):
@@ -88,12 +134,3 @@ def roi_labels(tmean_nii):
     rois_nii = nb.Nifti1Image(rois, tmean_nii.affine)
 
     return rois_nii
-
-
-def calc_roi_stats(tmean_nii, tsd_nii, tsfnr_nii, rois_nii):
-
-    roi_stats = dict()
-
-    roi_stats['SFNR'] = 0.0
-
-    return roi_stats

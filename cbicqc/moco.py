@@ -38,9 +38,12 @@ def moco_phantom(img_nii):
     Spherical QC phantom requires simpler registration approach.
     Use center of mass registration only.
 
-    :param img_nii: Nifti, image object
-    :return moco_nii: Nifti, motion corrected image object
-    :return moco_pars: array, motion parameter timeseries
+    :param img_nii: Nifti object,
+        4D QC time series
+    :return moco_nii: Nifti object,
+        Motion corrected 4D QC time series
+    :return moco_pars: array,
+        Motion parameter array (nt x 6)
     """
 
     img = img_nii.get_data()
