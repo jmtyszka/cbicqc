@@ -50,7 +50,7 @@ from .graphics import (plot_roi_timeseries, plot_roi_powerspec,
                        plot_mopar_timeseries, plot_mopar_powerspec,
                        orthoslices,
                        roi_demeaned_ts)
-from .rois import roi_labels
+from .rois import register_template, make_rois
 from .metrics import qc_metrics
 from .moco import moco_phantom, moco_live
 from .report import ReportPDF
@@ -201,7 +201,7 @@ class CBICQC:
         print('      Starting {} motion correction'.format(self._mode))
         t0 = dt.datetime.now()
 
-        qc_moco_nii, qc_moco_pars = self._moco(qc_nii)
+        qc_moco_nii, qc_moco_pars = self._moco(qc_nii, skip=True)
 
         t1 = dt.datetime.now()
         print('      Completed motion correction in {} seconds'.format((t1 - t0).seconds))
@@ -210,9 +210,13 @@ class CBICQC:
         print('      Calculating temporal mean image')
         tmean_nii, tsd_nii, tsfnr_nii = temporal_mean_sd(qc_moco_nii)
 
-        # Create ROI labels
-        print('      Constructing ROI labels')
-        rois_nii = roi_labels(tmean_nii)
+        # Register labels to temporal mean via template image
+        print('      Register labels to temporal mean image')
+        labels_nii = register_template(tmean_nii, self._work_dir, mode=self._mode)
+
+        # Generate ROIs from labels
+        # Construct Nyquist Ghost and airspace ROIs from labels
+        rois_nii = make_rois(labels_nii)
 
         # Extract ROI time series
         print('      Extracting ROI time series')
@@ -283,7 +287,7 @@ class CBICQC:
         Motion correction wrapper
 
         :param img_nii: Nifti, image object
-        :param skip: bool, skip moco flag
+        :param skip: bool, skip motion correction
         :return moco_nii: Nifti, motion corrected image object
         :return moco_pars: array, motion parameter timeseries
         """

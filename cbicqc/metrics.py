@@ -38,13 +38,16 @@ def qc_metrics(fit_results, tsfnr_nii, rois_nii):
     # TODO:
     # EMI analysis with zipper identification
     # Coil element SNR and fluctuation analysis
+    # - Requires separate labels for each coil element
 
-    signal_a_warm = fit_results[0].x[0]
-    signal_t_warm = fit_results[0].x[1]
-    signal_drift = fit_results[0].x[2]
-    signal_mean = fit_results[0].x[3]
+    air_mean = fit_results[0].x[3]
+
     nyquist_mean = fit_results[1].x[3]
-    noise_mean = fit_results[2].x[3]
+
+    signal_a_warm = fit_results[2].x[0]
+    signal_t_warm = fit_results[2].x[1]
+    signal_drift = fit_results[2].x[2]
+    signal_mean = fit_results[2].x[3]
 
     # Calculate main signal tSFNR
     tsfnr = calc_tsfnr(tsfnr_nii, rois_nii)
@@ -53,7 +56,7 @@ def qc_metrics(fit_results, tsfnr_nii, rois_nii):
     metrics = dict()
 
     metrics['SignalMean'] = signal_mean
-    metrics['SNR'] = signal_mean / noise_mean
+    metrics['SNR'] = signal_mean / air_mean
     metrics['SFNR'] = tsfnr
     metrics['SArtR'] = signal_mean / nyquist_mean
     metrics['Drift'] = signal_drift / signal_mean * 100
@@ -65,8 +68,8 @@ def qc_metrics(fit_results, tsfnr_nii, rois_nii):
     # sigma = mean(noise) * sqrt(pi/2)
     # See for example http://en.wikipedia.org/wiki/Half-normal_distribution
 
-    metrics['NoiseSigma'] = noise_mean * np.sqrt(np.pi/2)
-    metrics['NoiseFloor'] = noise_mean
+    metrics['NoiseSigma'] = air_mean * np.sqrt(np.pi/2)
+    metrics['NoiseFloor'] = air_mean
     metrics['SignalSpikes'] = spike_count(fit_results[0].fun)
     metrics['NyquistSpikes'] = spike_count(fit_results[1].fun)
     metrics['AirSpikes'] = spike_count(fit_results[2].fun)
@@ -100,7 +103,6 @@ def calc_tsfnr(tsfnr_nii, rois_nii):
 
     tsfnr_img = tsfnr_nii.get_data()
     rois_img = rois_nii.get_data()
-
 
     return np.mean(tsfnr_img[rois_img == 1])
 

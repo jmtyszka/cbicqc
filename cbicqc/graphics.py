@@ -45,7 +45,7 @@ def plot_roi_timeseries(t, s_mean_t, s_detrend_t, plot_fname):
     :return:
     """
 
-    roi_names = ['Phantom', 'Nyquist Ghost', 'Air']
+    roi_names = ['Air', 'Nyquist Ghost', 'Signal']
 
     plt.subplots(3, 1, figsize=(10, 5))
 
@@ -64,6 +64,9 @@ def plot_roi_timeseries(t, s_mean_t, s_detrend_t, plot_fname):
     # Save plot to file
     plt.savefig(plot_fname, dpi=300)
 
+    # Close plot
+    plt.close()
+
 
 def plot_roi_powerspec(t, s_detrend_t, plot_fname):
     """
@@ -75,7 +78,7 @@ def plot_roi_powerspec(t, s_detrend_t, plot_fname):
     :return:
     """
 
-    titles = ['Phantom (dB)', 'Nyquist Ghost (dB)', 'Air (dB)']
+    titles = ['Air (dB)', 'Nyquist Ghost (dB)', 'Signal (dB)']
 
     # Sampling frequency (Hz)
     fs = 1.0 / (t[1] - t[0])
@@ -111,6 +114,9 @@ def plot_roi_powerspec(t, s_detrend_t, plot_fname):
 
     # Save plot to file
     plt.savefig(plot_fname, dpi=300)
+
+    # Close plot
+    plt.close()
 
 
 def plot_mopar_timeseries(t, mopars, plot_fname):
@@ -148,6 +154,9 @@ def plot_mopar_timeseries(t, mopars, plot_fname):
 
     # Save plot to file
     plt.savefig(plot_fname, dpi=300)
+
+    # Close plot
+    plt.close()
 
 
 def plot_mopar_powerspec(t, mopars, plot_fname):
@@ -205,6 +214,9 @@ def plot_mopar_powerspec(t, mopars, plot_fname):
     # Save plot to file
     plt.savefig(plot_fname, dpi=300)
 
+    # Close plot
+    plt.close()
+
 
 def orthoslices(img_nii, ortho_fname, cmap='viridis', irng='default'):
 
@@ -245,6 +257,9 @@ def orthoslices(img_nii, ortho_fname, cmap='viridis', irng='default'):
 
     # Save plot to file
     plt.savefig(ortho_fname, dpi=300)
+
+    # Close plot
+    plt.close()
 
     return ortho_fname
 
@@ -297,6 +312,9 @@ def orthoslice_montage(img_nii, montage_fname, cmap='viridis', irng='default'):
     # Save plot to file
     plt.savefig(montage_fname, dpi=300)
 
+    # Close plot
+    plt.close()
+
 
 def roi_demeaned_ts(img_nii, rois_nii, residuals_fname):
     """
@@ -313,7 +331,7 @@ def roi_demeaned_ts(img_nii, rois_nii, residuals_fname):
     # Number of voxel samples from each ROI
     n_samp = 200
 
-    roi_name = ['Phantom', 'Nyquist Ghost', 'Air']
+    roi_name = ['Air', 'Nyquist Ghost', 'Signal']
 
     rois = rois_nii.get_data()
     s = img_nii.get_data()
@@ -359,6 +377,9 @@ def roi_demeaned_ts(img_nii, rois_nii, residuals_fname):
     # Save plot to file
     plt.savefig(residuals_fname, dpi=300)
 
+    # Close plot
+    plt.close()
+
 
 def trend_subplot(m_name, t, m):
     """
@@ -383,4 +404,7 @@ def trend_subplot(m_name, t, m):
 
     plt.gcf().autofmt_xdate()
     plt.title(m_name, loc='left')
+
+    # Close plot
+    plt.close()
 

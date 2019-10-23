@@ -51,7 +51,12 @@ def extract_timeseries(qc_moco_nii, rois_nii):
     # Number of time points
     nt = s.shape[3]
 
-    # Signal, Nyquist Ghost and Air label indices
+    # ROI label indices
+    # 0 : unassigned
+    # 1 : air space
+    # 2 : Nyquist ghost
+    # 3 : signal
+
     labels = [1, 2, 3]
     nl = len(labels)
 

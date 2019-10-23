@@ -92,6 +92,7 @@ class SummaryPDF:
         metric_list = [
             'SNR',
             'SFNR',
+            'NoiseFloor',
             'Drift',
             'NyquistSpikes',
             'AirSpikes'

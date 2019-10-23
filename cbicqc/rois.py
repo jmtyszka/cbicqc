@@ -30,16 +30,14 @@ SOFTWARE.
 """
 
 import os
+import sys
 import subprocess
-import importlib.resources as ir
+import pkg_resources
 import nibabel as nb
 import numpy as np
-from skimage.filters import threshold_otsu
 from scipy.ndimage.morphology import (binary_dilation,
                                       binary_erosion,
-                                      generate_binary_structure,
-                                      iterate_structure)
-
+                                      generate_binary_structure)
 
 
 def register_template(tmean_nii, work_dir, mode='phantom'):
@@ -63,52 +61,81 @@ def register_template(tmean_nii, work_dir, mode='phantom'):
 
     # Link appropriate template for mode
     if 'phantom' in mode:
-        in_fname = ir.path('cbicqc', 'fbirn_sphere.nii.gz')
         dof = 6
+        template_fname = pkg_resources.resource_filename(
+            __name__,
+            os.path.join('templates', 'fbirn_sphere.nii.gz')
+        )
+        labels_fname = pkg_resources.resource_filename(
+            __name__,
+            os.path.join('templates', 'fbirn_labels.nii.gz')
+        )
     else:
-        in_fname = ir.path('cbicqc', 'mni_icbm152_t1_tal_nlin_sym_09c.nii')
         dof = 12
+        template_fname = pkg_resources.resource_filename(
+            __name__,
+            os.path.join('templates', 'MNI152_T1_2mm.nii.gz')
+        )
+        labels_fname = pkg_resources.resource_filename(
+            __name__,
+            os.path.join('templates', 'MNI-maxprob-thr25-2mm.nii.gz')
+        )
 
-    out_fname = os.path.join(work_dir, 'registered_template.nii.gz')
+    template_xfm_fname = os.path.join(work_dir, 'template_xfm.nii.gz')
+    labels_xfm_fname = os.path.join(work_dir, 'labels_xfm.nii.gz')
 
-    flirt_cmd = os.path.join(os.environ['FSLDIR'], 'bin', 'flirt')
-    subprocess.run([flirt_cmd,
-                    '-in', in_fname,
-                    '-ref', tmean_nii,
-                    '-out', out_fname,
-                    '-dof', dof])
+    fsl_dir = os.environ['FSLDIR']
+    flirt_cmd = os.path.join(fsl_dir, 'bin', 'flirt')
+    xfm_fname = os.path.join(work_dir, 'xfm.mat')
 
-    # Load motion corrected QC timeseries
-    # moco_nii = nb.load(out_stub + '.nii.gz')
-    # moco_pars = np.genfromtxt(out_stub + '.par')
+    # Run FLIRT registration
+    print('      Registering template to subject ({} DOF)'.format(dof))
+    cmd = [flirt_cmd,
+           '-in', template_fname,
+           '-ref', tmean_fname,
+           '-out', template_xfm_fname,
+           '-dof', str(dof),
+           '-omat', xfm_fname,
+    ]
+    subprocess.run(cmd, stderr=sys.stderr, stdout=sys.stdout)
 
-    return
+    # Apply resulting transform to label image
+    print('      Resampling labels to subject space')
+    cmd = [flirt_cmd,
+           '-in', labels_fname,
+           '-ref', tmean_fname,
+           '-out', labels_xfm_fname,
+           '-applyxfm',
+           '-init', xfm_fname,
+           '-interp', 'nearestneighbour',
+    ]
+    subprocess.run(cmd, stderr=sys.stderr, stdout=sys.stdout)
+
+    # Load labels transformed to subject space
+    print('      Loading resampled labels')
+    labels_nii = nb.load(labels_xfm_fname)
+
+    return labels_nii
 
 
-def roi_labels(tmean_nii):
+def make_rois(labels_nii):
+    """
+    Organize labels and add air space and Nyquist ROIs
 
-    # Threshold method - possible future argument
-    threshold_method = 'percentile'
+    :param labels_nii: Nifti object,
+        Raw labels in subject space
+    :return rois_nii: Nifti object,
+        Integer ROI image include air and Nyquist ghost
+    """
 
-    tmean = tmean_nii.get_data()
+    # Extract label image
+    labels_img = labels_nii.get_data().astype(np.uint)
 
-    # Grab mean image dimensions
-    nx, ny, nz = tmean.shape
-
-    # Signal threshold
-    if 'otsu' in threshold_method:
-        th = threshold_otsu(tmean)
-    elif 'percentile' in threshold_method:
-        th = np.percentile(tmean, 99) * 0.1
-    else:
-        th = np.max(tmean) * 0.1
-
-    # Main signal mask
-    signal_mask = tmean > th
+    # Create signal mask from sum of all ROI labels
+    signal_mask = labels_img > 0
 
     # Construct 3D binary sphere structuring element
     k = generate_binary_structure(3, 2)  # 3D, 2-connected
-    # k = iterate_structure(k, iterations=1)
 
     # Erode signal mask x N, then dilate x 2N
     n_iter = 2
@@ -116,21 +143,23 @@ def roi_labels(tmean_nii):
     signal_mask_dil = binary_dilation(signal_mask_ero, structure=k, iterations=n_iter * 2)
 
     # Create Nyquist mask by rolling eroded signal mask by FOVy/2
+    ny = signal_mask.shape[1]
     nyquist_mask = np.roll(signal_mask_ero, int(ny / 2), axis=1)
 
     # Exclusive Nyquist ghost mask (remove overlap with dilated signal mask)
-    nyquist_only_mask = np.logical_and(nyquist_mask, np.logical_not(np.logical_and(nyquist_mask, signal_mask_dil)))
+    nyquist_only_mask = np.logical_and(nyquist_mask, np.logical_not(np.logical_and(nyquist_mask, signal_mask_dil))).astype(np.uint)
 
     # Create air mask
-    air_mask = 1 - signal_mask_dil - nyquist_only_mask
+    air_mask = (1 - signal_mask_dil - nyquist_only_mask).astype(np.uint)
 
     # Finally merge all masks into an ROI label file
     # Undefined       = 0
-    # Signal          = 1
+    # Air Space       = 1
     # Nyquist Ghost   = 2
-    # Air Space       = 3
-    rois = np.uint8(signal_mask_ero + 2 * nyquist_only_mask + 3 * air_mask)
+    # Other ROIs      = 3, 4, 5, ...
+    rois = air_mask + 2 * nyquist_only_mask + labels_img + 2 * signal_mask
 
-    rois_nii = nb.Nifti1Image(rois, tmean_nii.affine)
+    # Wrap image in a Nifti object
+    rois_nii = nb.Nifti1Image(rois, labels_nii.affine)
 
     return rois_nii
