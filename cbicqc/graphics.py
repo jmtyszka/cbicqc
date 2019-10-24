@@ -405,6 +405,3 @@ def trend_subplot(m_name, t, m):
     plt.gcf().autofmt_xdate()
     plt.title(m_name, loc='left')
 
-    # Close plot
-    plt.close()
-

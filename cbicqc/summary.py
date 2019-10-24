@@ -151,9 +151,11 @@ class SummaryPDF:
         mm = []
 
         for mt in self._metrics:
-            dt = datetime.strptime(mt['AcquisitionDateTime'], '%Y-%m-%dT%H:%M:%S.%f')
-            t.append(dt)
-            mm.append([mt[m_name] for m_name in metric_list])
+
+            if 'AcquisitionDateTime' in mt.keys():
+                dt = datetime.strptime(mt['AcquisitionDateTime'], '%Y-%m-%dT%H:%M:%S.%f')
+                t.append(dt)
+                mm.append([mt[m_name] for m_name in metric_list])
 
         t, mm = np.array(t), np.array(mm)
 
