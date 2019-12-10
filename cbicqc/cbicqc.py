@@ -108,10 +108,11 @@ class CBICQC:
         print('')
 
         # Index BIDS directory
-        print('  Indexing BIDS Layout')
+        print('  Indexing BIDS layout')
         self._layout = BIDSLayout(self._bids_dir,
                                   absolute_paths=True,
                                   ignore=['sourcedata', 'work', 'derivatives', 'exclude'])
+        print('    Indexing complete')
         print('')
 
         # Get complete subject list
@@ -134,6 +135,7 @@ class CBICQC:
 
             for self._this_session in session_list:
 
+                print('')
                 print('    Session {}'.format(self._this_session))
 
                 # Report PDF and JSON filenames - used in both report and summarize modes
@@ -148,8 +150,14 @@ class CBICQC:
 
                 else:
 
-                    # QC analysis and report generation
-                    self._analyze_and_report()
+                    if os.path.isfile(self._report_pdf) and os.path.isfile(self._report_json):
+
+                        print('      Report and metadata detected for this session - skipping')
+
+                    else:
+
+                        # QC analysis and report generation
+                        self._analyze_and_report()
 
             if self._summary:
 

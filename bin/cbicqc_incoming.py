@@ -1,10 +1,32 @@
 #!/usr/bin/env python3
 """
-Fix subject and session directory naming in sourcedata for CBIC QC series exported from Horos
+Rename and organize Horos QC exported data in <BIDS Root>/incoming and place in <BIDS Root>/sourcedata
 
 AUTHOR
 ----
 Mike Tyszka, Ph.D.
+
+MIT License
+
+Copyright (c) 2019 Mike Tyszka
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 """
 
 import os
@@ -27,20 +49,31 @@ def main():
     args = parser.parse_args()
     dataset_dir = os.path.realpath(args.dataset)
 
-    src_dir = os.path.join(dataset_dir, 'sourcedata')
-    qc_dir = os.path.join(src_dir, 'QC')
+    incoming_dir = os.path.join(dataset_dir, 'incoming')
+    sourcedata_dir = os.path.join(dataset_dir, 'sourcedata')
+    qc_dir = os.path.join(sourcedata_dir, 'QC')
 
     # Create single QC subject
-    os.makedirs(qc_dir, exist_ok=True)
+    print("Checking that QC subject exists in sourcedata")
+    if os.path.isdir(qc_dir):
+        print("  It does - continuning")
+    else:
+        print("  QC subject does not exist - creating QC subject in sourcedata")
+        os.makedirs(qc_dir, exist_ok=True)
 
     # Loop over all Qc study directories in sourcedata
     # Expect subject/session directory names in the form "Qc_<session ID>_*/<session dir>/"
     # Move session subdirectories from Qc_*/<session dir> to Qc/<ScanDate>
 
-    for sub_dir in glob(os.path.join(src_dir, 'Qc*')):
+    print("Scanning for incoming QC studies")
+
+    for inc_qc_dir in glob(os.path.join(incoming_dir, 'Qc*')):
+
+        print("")
+        print("  Processing {}".format(inc_qc_dir))
 
         # There should be only one session subdirectory
-        dlist = list(glob(os.path.join(sub_dir, '*')))
+        dlist = list(glob(os.path.join(inc_qc_dir, '*')))
 
         if len(dlist) > 0:
 
@@ -56,12 +89,12 @@ def main():
             dest_dir = os.path.join(qc_dir, acq_date)
 
             # Move and rename session subdirectory
-            print('Moving %s to %s' % (ses_dir, dest_dir))
+            print('  Moving %s to %s' % (ses_dir, dest_dir))
             os.rename(ses_dir, dest_dir)
 
-        # Delete old Qc_* subject directory
-        print('Deleting %s' % sub_dir)
-        rmtree(sub_dir)
+        # Delete incoming Qc_* directory
+        print('  Deleting %s' % inc_qc_dir)
+        rmtree(inc_qc_dir)
 
 
 def acquisition_date(dcm_fname):

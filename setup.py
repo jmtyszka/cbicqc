@@ -181,7 +181,7 @@ setup(
     # data_files=[('my_data', ['data/data_file'])],  # Optional
 
     # Utility scripts will be installed to /opt/local/Library/Frameworks/Python.framework/Versions/3.7/bin or equivalent
-    scripts=['bin/setup_sourcedata'],
+    scripts=['bin/cbicqc_incoming.py'],
 
     # To provide executable scripts, use entry points in preference to the
     # "scripts" keyword. Entry points provide cross-platform support and allow
