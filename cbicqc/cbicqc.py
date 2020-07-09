@@ -199,6 +199,16 @@ class CBICQC:
             print('      * Using default imaging parameters')
             meta = self.default_metadata()
 
+        # Check for missing fields (typically non-Siemens scanners)
+        if not 'SequenceName' in meta:
+            meta['SequenceName'] = 'Unknown Sequence'
+
+        if not 'ReceiveCoilName' in meta:
+            meta['ReceiveCoilName'] = 'Unknown Coil'
+
+        if not 'BandwidthPerPixelPhaseEncode' in meta:
+            meta['BandwidthPerPixelPhaseEncode'] = '-'
+
         # Integrate additional meta data from Nifti header and filename
         meta['Subject'] = self._this_subject
         meta['Session'] = self._this_session
