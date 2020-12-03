@@ -43,7 +43,7 @@ import numpy as np
 import nibabel as nb
 import datetime as dt
 
-from bids import BIDSLayout
+import bids
 
 from .timeseries import temporal_mean_sd, extract_timeseries, detrend_timeseries
 from .graphics import (plot_roi_timeseries, plot_roi_powerspec,
@@ -109,9 +109,12 @@ class CBICQC:
 
         # Index BIDS directory
         print('  Indexing BIDS layout')
-        self._layout = BIDSLayout(self._bids_dir,
+
+        bids.config.set_option('extension_initial_dot', True)
+        self._layout = bids.BIDSLayout(self._bids_dir,
                                   absolute_paths=True,
                                   ignore=['sourcedata', 'work', 'derivatives', 'exclude'])
+
         print('    Indexing complete')
         print('')
 
@@ -173,7 +176,7 @@ class CBICQC:
 
         # Get first QC image for this subject/session
         img_list = self._layout.get(return_type='file',
-                                    extensions=['nii', 'nii.gz'],
+                                    extension=['nii', 'nii.gz'],
                                     subject=self._this_subject,
                                     session=self._this_session,
                                     suffix=self._suffix)
@@ -200,13 +203,13 @@ class CBICQC:
             meta = self.default_metadata()
 
         # Check for missing fields (typically non-Siemens scanners)
-        if not 'SequenceName' in meta:
+        if 'SequenceName' not in meta:
             meta['SequenceName'] = 'Unknown Sequence'
 
-        if not 'ReceiveCoilName' in meta:
+        if 'ReceiveCoilName' not in meta:
             meta['ReceiveCoilName'] = 'Unknown Coil'
 
-        if not 'BandwidthPerPixelPhaseEncode' in meta:
+        if 'BandwidthPerPixelPhaseEncode' not in meta:
             meta['BandwidthPerPixelPhaseEncode'] = '-'
 
         # Integrate additional meta data from Nifti header and filename
@@ -382,8 +385,3 @@ class CBICQC:
 
         print('Saving QC report to {}'.format(dest_pdf))
         shutil.copyfile(src_pdf, dest_pdf)
-
-
-
-
-
