@@ -49,7 +49,6 @@ from reportlab.platypus import (SimpleDocTemplate,
                                 Spacer,
                                 Image,
                                 Table,
-                                TableStyle,
                                 PageBreak)
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
@@ -162,8 +161,7 @@ class ReportPDF:
                          ['Noise Floor', '{:.1f}'.format(self._metrics['NoiseFloor'])],
                          ['Signal Spikes', '{}'.format(self._metrics['SignalSpikes'])],
                          ['Nyquist Ghost Spikes', '{}'.format(self._metrics['NyquistSpikes'])],
-                         ['Air Spikes', '{}'.format(self._metrics['AirSpikes'])],
-                         ]
+                         ['Air Spikes', '{}'.format(self._metrics['AirSpikes'])]]
 
         ptext = '<font size=11><b>Noise and Spiking</b></font>'
         self._contents.append(Paragraph(ptext, self._pstyles['Justify']))

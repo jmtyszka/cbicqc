@@ -59,7 +59,7 @@ from .summary import SummaryPDF
 
 class CBICQC:
 
-    def __init__(self, bids_dir, subject='', session='', mode='phantom', summary=False):
+    def __init__(self, bids_dir, subject='', session='', mode='phantom', summary=0):
 
         # Copy arguments into object
         self._bids_dir = bids_dir
@@ -146,7 +146,7 @@ class CBICQC:
                                                 '{}_{}_qc.pdf'.format(self._this_subject, self._this_session))
                 self._report_json = self._report_pdf.replace('.pdf', '.json')
 
-                if self._summary:
+                if self._summary > 0:
 
                     # Load metrics for this subject/session
                     metric_list.append(self._get_metrics())
@@ -162,10 +162,10 @@ class CBICQC:
                         # QC analysis and report generation
                         self._analyze_and_report()
 
-            if self._summary:
+            if self._summary > 0:
 
                 # Generate summary report
-                SummaryPDF(self._report_dir, metric_list)
+                SummaryPDF(self._report_dir, metric_list, self._summary)
 
             else:
 

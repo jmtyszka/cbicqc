@@ -99,8 +99,8 @@ setup(
         'Development Status :: 3 - Alpha',
 
         # Indicate who your project is intended for
-        'Intended Audience :: Researchers',
-        'Topic :: Neuroimaging :: Conversion Tools',
+        'Intended Audience :: Science/Research',
+        'Topic :: Scientific/Engineering :: Image Processing',
 
         # Pick your license as you wish
         'License :: OSI Approved :: MIT License',
@@ -111,6 +111,7 @@ setup(
         # 'python_requires' below.
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
     ],
 
     # This field adds keywords for your project which will appear on the

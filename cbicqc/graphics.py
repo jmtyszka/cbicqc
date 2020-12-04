@@ -30,6 +30,7 @@ import matplotlib.dates as mdates
 from scipy.signal import periodogram
 from skimage.util import montage
 from skimage.exposure import rescale_intensity
+import pandas as pd
 
 from .moco import total_rotation
 
@@ -381,27 +382,26 @@ def roi_demeaned_ts(img_nii, rois_nii, residuals_fname):
     plt.close()
 
 
-def trend_subplot(m_name, t, m):
+def metric_trend_plot(metric_name, t, m, axs):
     """
     Plot session metric trend with median, 5th and 95th percentiles
+    Add metric histogram at right
 
+    :param metric_name: str, metric name
     :param t: datetime, session datetime
     :param m: array, metric trend
     :return:
     """
 
+    # Create a dataframe
+    df = pd.DataFrame({'Date': t, metric_name: m})
+
+    # Calculate metric limits and 5/95 percentiles
     t0, t1 = np.min(t), np.max(t)
     p5, p50, p95 = np.percentile(m, (5, 50, 95))
-
-    plt.gca().xaxis.set_major_locator(mdates.MonthLocator())
-    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%b'))
 
     plt.plot([t0, t1], [p5, p5], 'g:')
     plt.plot([t0, t1], [p50, p50], 'g')
     plt.plot([t0, t1], [p95, p95], 'g:')
 
-    plt.plot(t, m, 'or')
-
-    plt.gcf().autofmt_xdate()
-    plt.title(m_name, loc='left')
 

@@ -39,12 +39,11 @@ from cbicqc.cbicqc import CBICQC
 
 
 def main():
-
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Lightweight daily phantom QC analysis and reporting')
     parser.add_argument('-d', '--dir', default='.', help='BIDS QC dataset directory')
     parser.add_argument('-m', '--mode', default='phantom', help="QC Mode (phantom or live)")
-    parser.add_argument('-s', '--summary', action='store_true', help='Generate QC summary for all sessions')
+    parser.add_argument('-s', '--summary', default=0, help='Generate QC summary for past N months [0 no summary]')
     parser.add_argument('--sub', default='', help='Subject ID')
     parser.add_argument('--ses', default='', help='Session ID')
 
@@ -70,8 +69,8 @@ def main():
 
     print('Subject : {}'.format(subj_id if len(subj_id) > 0 else 'All Subjects'))
 
-    if summary:
-        print('Summarizing All Sessions')
+    if summary > 0:
+        print('Summarizing last {:d} months'.format(summary))
     else:
         print('Session : {}'.format(sess_id if len(sess_id) > 0 else 'All Sessions'))
 
@@ -87,5 +86,4 @@ def main():
 
 # This is the standard boilerplate that calls the main() function.
 if __name__ == '__main__':
-
     main()

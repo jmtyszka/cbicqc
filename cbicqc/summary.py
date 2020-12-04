@@ -45,19 +45,21 @@ from reportlab.platypus import (SimpleDocTemplate,
                                 Paragraph,
                                 Spacer,
                                 Image,
-                                Table)
+                                Table,
+                                PageBreak)
 
-from .graphics import trend_subplot
+from .graphics import (metric_trend_plot)
 
 
 class SummaryPDF:
 
-    def __init__(self, report_dir, metrics):
+    def __init__(self, report_dir, metrics, summary_months):
         """
         Construct summary report PDF
 
         :param report_dir: str, report output directory in derivatives
         :param metrics: list, session metric dictionaries including metadata
+        :param summary_months: int, number of past months to summarize
         """
 
         # For datetime axis labeling without warnings
@@ -66,6 +68,7 @@ class SummaryPDF:
         self._report_dir = report_dir
         self._metrics = metrics
         self._subject = metrics[0]['Subject']
+        self._summary_months = summary_months
         self._summary_pdf = os.path.join(report_dir, '{}_summary.pdf'.format(self._subject))
 
         # Create working directory for images
@@ -80,30 +83,44 @@ class SummaryPDF:
 
         self._init_pdf()
         self._add_coverpage()
-        self._add_metric_trends()
+        self._add_metric_graphs('Noise')
+        self._add_metric_graphs('Spike/Drift')
 
         self._doc.build(self._contents)
 
         # Delete working directory
         shutil.rmtree(self._work_dir)
 
-    def _add_metric_trends(self):
+    def _add_metric_graphs(self, metric='Noise'):
+        """
+        Add timecourse and histogram plots for the given metric class ('Noise' or 'Spike/Drift')
+        :return:
+        """
 
-        metric_list = [
-            'SNR',
-            'SFNR',
-            'NoiseFloor',
-            'Drift',
-            'NyquistSpikes',
-            'AirSpikes'
-        ]
+        if 'Noise' in metric:
+            metric_list = [
+                'SNR',
+                'SFNR',
+                'NoiseFloor'
+            ]
+        elif 'Spike/Drift' in metric:
+            metric_list = [
+                'Drift',
+                'NyquistSpikes',
+                'AirSpikes'
+            ]
+        else:
+            print('* Unknown metric class : {:s} - skipping'.format(metric))
+            return
 
-        trend_png_fname = self._plot_trends(metric_list)
+        # Page break
+        self._contents.append(PageBreak())
 
-        ptext = '<font size=14><b>Session Metric Trends</b></font>'
+        ptext = '<font size=14><b>Session {:s}} Trends</b></font>'.format(metric)
         self._contents.append(Paragraph(ptext, self._pstyles['Justify']))
         self._contents.append(Spacer(1, 0.25 * inch))
 
+        trend_png_fname = self._plot_trends(metric_list)
         trends_img = Image(trend_png_fname, 6.0 * inch, 6.0 * inch, hAlign='LEFT')
         self._contents.append(trends_img)
 
@@ -144,6 +161,13 @@ class SummaryPDF:
         self._contents.append(Spacer(1, 0.25 * inch))
 
     def _plot_trends(self, metric_list):
+        """
+        Generate a PNG of the trends and histogram for each of the passed metrics
+
+        :param metric_list: str list
+            List of metrics to plots
+        :return:
+        """
 
         nm = len(metric_list)
 
@@ -161,21 +185,19 @@ class SummaryPDF:
 
         t, mm = np.array(t), np.array(mm)
 
+        # Output PNG filenames
         png_fname = os.path.join(self._work_dir, 'metric_trends.png')
 
-        plt.subplots(nm, 1, figsize=(7, 7))
+        # Create a subplot matrix to hold trend and histogram plots
+        fig, axs = plt.subplots(nm, 2, figsize=(nm * 2.0, 7.0))
 
+        # Fill each of the subplots
         for mc, m_name in enumerate(metric_list):
+            metric_trend_plot(m_name, t, mm[:, mc], axs[mc, 0])
+            #metric_histogram(m_name, t, mm[:, mc], axs[mc, 1])
 
-            plt.subplot(nm, 1, mc+1)
-            trend_subplot(m_name, t, mm[:, mc])
-
-        # Add time axis label to final subplot
-        plt.xlabel('Date')
-
+        # Tweak subplot margins and spacing
         plt.subplots_adjust(bottom=0.0, top=0.9, left=0.0, right=1.0)
-
-        # Remove excess space
         plt.tight_layout()
 
         # Save plot to file
