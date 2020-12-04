@@ -39,6 +39,7 @@ from cbicqc.cbicqc import CBICQC
 
 
 def main():
+
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Lightweight daily phantom QC analysis and reporting')
     parser.add_argument('-d', '--dir', default='.', help='BIDS QC dataset directory')

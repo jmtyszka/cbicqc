@@ -156,6 +156,8 @@ class SummaryPDF:
                 dt = datetime.strptime(mt['AcquisitionDateTime'], '%Y-%m-%dT%H:%M:%S.%f')
                 t.append(dt)
                 mm.append([mt[m_name] for m_name in metric_list])
+            else:
+                print('* Acquisition time unknown - skipping')
 
         t, mm = np.array(t), np.array(mm)
 
