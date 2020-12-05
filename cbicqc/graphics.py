@@ -27,10 +27,13 @@ Copyright 2019 California Institute of Technology.
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
+import matplotlib.gridspec as gridspec
+
 from scipy.signal import periodogram
 from skimage.util import montage
 from skimage.exposure import rescale_intensity
 import pandas as pd
+from datetime import date
 
 from .moco import total_rotation
 
@@ -382,7 +385,7 @@ def roi_demeaned_ts(img_nii, rois_nii, residuals_fname):
     plt.close()
 
 
-def metric_trend_plot(metric_name, t, m, axs):
+def metric_trend_plot(metric_name, t, m, gridspec, past_months=6):
     """
     Plot session metric trend with median, 5th and 95th percentiles
     Add metric histogram at right
@@ -393,15 +396,48 @@ def metric_trend_plot(metric_name, t, m, axs):
     :return:
     """
 
-    # Create a dataframe
+    # Fill a temporary dataframe
     df = pd.DataFrame({'Date': t, metric_name: m})
 
-    # Calculate metric limits and 5/95 percentiles
-    t0, t1 = np.min(t), np.max(t)
-    p5, p50, p95 = np.percentile(m, (5, 50, 95))
+    t1 = pd.Timestamp(date.today())
+    t0 = t1 - pd.DateOffset(months=24)
 
-    plt.plot([t0, t1], [p5, p5], 'g:')
-    plt.plot([t0, t1], [p50, p50], 'g')
-    plt.plot([t0, t1], [p95, p95], 'g:')
+    ax0 = plt.subplot(gridspec[0])
+
+    df.plot.scatter(
+        x='Date',
+        y=metric_name,
+        xlim=(t0, t1),
+        ax=ax0
+    )
+
+    ax0.xaxis.label.set_size(14)
+    ax0.yaxis.label.set_size(14)
+
+    # Calculate metric limits and 5/95 percentiles
+    p5, p50, p95 = np.percentile(df[metric_name].values, (5, 50, 95))
+
+    ax0.plot([t0, t1], [p5, p5], 'g:')
+    ax0.plot([t0, t1], [p50, p50], 'g')
+    ax0.plot([t0, t1], [p95, p95], 'g:')
+
+    ax1 = plt.subplot(gridspec[1], sharey=ax0)
+    df.hist(
+        column='SNR',
+        grid=False,
+        bins=20,
+        orientation='horizontal',
+        ec='black',
+        fc='palegreen',
+        ax=ax1,
+    )
+
+    # Simplify graph axes
+    ax0.spines['right'].set_visible(False)
+    ax0.spines['top'].set_visible(False)
+    ax0.yaxis.set_ticks_position('left')
+    ax0.xaxis.set_ticks_position('bottom')
+    ax1.axis('off')
+    ax1.set_title('')
 
 

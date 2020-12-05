@@ -35,6 +35,8 @@ import tempfile
 from datetime import datetime
 
 import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
+
 from pandas.plotting import register_matplotlib_converters
 import numpy as np
 from reportlab.lib.enums import TA_JUSTIFY
@@ -169,7 +171,7 @@ class SummaryPDF:
         :return:
         """
 
-        nm = len(metric_list)
+        n_metrics = len(metric_list)
 
         t = []
         mm = []
@@ -188,16 +190,15 @@ class SummaryPDF:
         # Output PNG filenames
         png_fname = os.path.join(self._work_dir, 'metric_trends.png')
 
-        # Create a subplot matrix to hold trend and histogram plots
-        fig, axs = plt.subplots(nm, 2, figsize=(nm * 2.0, 7.0))
+        plt.figure(figsize=(16, 12))
+
+        gs = gridspec.GridSpec(n_metrics, 2, width_ratios=[3, 1])
 
         # Fill each of the subplots
         for mc, m_name in enumerate(metric_list):
-            metric_trend_plot(m_name, t, mm[:, mc], axs[mc, 0])
-            #metric_histogram(m_name, t, mm[:, mc], axs[mc, 1])
+            metric_trend_plot(m_name, t, mm[:, mc], gridspec=gs[mc, :], past_months=24)
 
         # Tweak subplot margins and spacing
-        plt.subplots_adjust(bottom=0.0, top=0.9, left=0.0, right=1.0)
         plt.tight_layout()
 
         # Save plot to file
