@@ -42,6 +42,7 @@ import shutil
 import numpy as np
 import nibabel as nb
 import datetime as dt
+import pandas as pd
 
 import bids
 
@@ -54,19 +55,19 @@ from .rois import register_template, make_rois
 from .metrics import qc_metrics
 from .moco import moco_phantom, moco_live
 from .report import ReportPDF
-from .summary import SummaryPDF
+from .summary import Summarize
 
 
 class CBICQC:
 
-    def __init__(self, bids_dir, subject='', session='', mode='phantom', summary=0):
+    def __init__(self, bids_dir, subject='', session='', mode='phantom', past_months=12):
 
         # Copy arguments into object
         self._bids_dir = bids_dir
         self._subject = subject
         self._session = session
         self._mode = mode
-        self._summary = summary
+        self._past_months = past_months
 
         # Phantom or in vivo suffix ('T2star' or 'bold')
         self._suffix = 'T2star' if 'phantom' in mode else 'bold'
@@ -101,6 +102,10 @@ class CBICQC:
         # Flags
         self._save_intermediates = False
 
+        # Metrics of interest to summarize
+        self._metrics_df = pd.DataFrame()
+        self._metrics_of_interest = []
+
     def run(self):
 
         print('')
@@ -118,16 +123,18 @@ class CBICQC:
         print('    Indexing complete')
         print('')
 
-        # Get complete subject list
+        # Get complete subject list from BIDS layout
         if self._subject:
             subject_list = [self._subject]
         else:
             subject_list = self._layout.get_subjects()
 
+        # Loop over all QC subjects
         for self._this_subject in subject_list:
 
             print('  Subject {}'.format(self._this_subject))
 
+            # Get the session list either from class data or BIDS layout (fallback)
             if self._session:
                 session_list = [self._session]
             else:
@@ -146,31 +153,27 @@ class CBICQC:
                                                 '{}_{}_qc.pdf'.format(self._this_subject, self._this_session))
                 self._report_json = self._report_pdf.replace('.pdf', '.json')
 
-                if self._summary > 0:
+                if os.path.isfile(self._report_pdf) and os.path.isfile(self._report_json):
 
-                    # Load metrics for this subject/session
-                    metric_list.append(self._get_metrics())
+                    # QC analysis and reporting already run
+                    print('      Report and metadata detected for this session')
 
                 else:
 
-                    if os.path.isfile(self._report_pdf) and os.path.isfile(self._report_json):
+                    # QC analysis and report generation
+                    self._analyze_and_report()
 
-                        print('      Report and metadata detected for this session - skipping')
+                # Add metrics for this subject/session to cumulative list
+                metric_list.append(self._get_metrics())
 
-                    else:
+            # Convert metric list to dataframe and save to file
+            self._metrics_df = pd.DataFrame(metric_list)
 
-                        # QC analysis and report generation
-                        self._analyze_and_report()
+            # Generate summary report for this subject
+            Summarize(self._report_dir, self._metrics_df, self._past_months)
 
-            if self._summary > 0:
-
-                # Generate summary report
-                SummaryPDF(self._report_dir, metric_list, self._summary)
-
-            else:
-
-                # Cleanup temporary QC directory
-                self.cleanup()
+            # Cleanup temporary QC directory
+            self.cleanup()
 
     def _analyze_and_report(self):
 

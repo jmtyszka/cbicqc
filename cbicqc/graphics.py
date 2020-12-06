@@ -385,32 +385,45 @@ def roi_demeaned_ts(img_nii, rois_nii, residuals_fname):
     plt.close()
 
 
-def metric_trend_plot(metric_name, t, m, gridspec, past_months=6):
+def metric_trend_plot(mc, metric_name, metrics_df, gridspec, past_months=12):
     """
     Plot session metric trend with median, 5th and 95th percentiles
     Add metric histogram at right
 
-    :param metric_name: str, metric name
-    :param t: datetime, session datetime
-    :param m: array, metric trend
+    :param mc: int, index of metric to plot
+    :param metric_name: str, metric name to plot
+    :param metrics_df: DataFrame, complete metric dataframe for current subject
+    :param gridspec: GridSpec, pyplot grid specification
+    :param past_months: int, number of past months to plot
     :return:
     """
 
-    # Fill a temporary dataframe
-    df = pd.DataFrame({'Date': t, metric_name: m})
+    # Extract subframe for this metric timeseries
+    df = metrics_df[['Date', metric_name, 'Outlier']]
 
     t1 = pd.Timestamp(date.today())
-    t0 = t1 - pd.DateOffset(months=24)
+    t0 = t1 - pd.DateOffset(months=past_months)
 
-    ax0 = plt.subplot(gridspec[0])
+    ax0 = plt.subplot(gridspec[mc, 0])
 
-    df.plot.scatter(
-        x='Date',
-        y=metric_name,
-        xlim=(t0, t1),
-        ax=ax0
-    )
+    marker_dict = {'Outlier': 'x', 'Inlier': 'o'}
+    color_dict = {'Outlier': 'red', 'Inlier': 'palegreen'}
 
+    for kind in marker_dict:
+
+        inds = df['Outlier'] == kind
+        xx = df[inds]['Date']
+        yy = df[inds][metric_name]
+
+        ax0.scatter(
+            x=xx,
+            y=yy,
+            c=color_dict[kind],
+            ec='black',
+        )
+
+    ax0.set_xlim(t0, t1)
+    ax0.set_ylabel(metric_name, labelpad=20)
     ax0.xaxis.label.set_size(14)
     ax0.yaxis.label.set_size(14)
 
@@ -421,9 +434,9 @@ def metric_trend_plot(metric_name, t, m, gridspec, past_months=6):
     ax0.plot([t0, t1], [p50, p50], 'g')
     ax0.plot([t0, t1], [p95, p95], 'g:')
 
-    ax1 = plt.subplot(gridspec[1], sharey=ax0)
+    ax1 = plt.subplot(gridspec[mc, 1], sharey=ax0)
     df.hist(
-        column='SNR',
+        column=metric_name,
         grid=False,
         bins=20,
         orientation='horizontal',

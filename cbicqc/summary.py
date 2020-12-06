@@ -8,7 +8,7 @@ Mike Tyszka, Ph.D., Caltech Brain Imaging Center
 
 MIT License
 
-Copyright (c) 2019 Mike Tyszka
+Copyright (c) 2020 Mike Tyszka
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -32,13 +32,16 @@ SOFTWARE.
 import os
 import shutil
 import tempfile
+import numpy as np
 from datetime import datetime
 
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 
+from sklearn.cluster import DBSCAN
+from sklearn.preprocessing import StandardScaler
+
 from pandas.plotting import register_matplotlib_converters
-import numpy as np
 from reportlab.lib.enums import TA_JUSTIFY
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -53,25 +56,47 @@ from reportlab.platypus import (SimpleDocTemplate,
 from .graphics import (metric_trend_plot)
 
 
-class SummaryPDF:
+class Summarize:
 
-    def __init__(self, report_dir, metrics, summary_months):
+    def __init__(self, report_dir, metrics_df, past_months):
         """
-        Construct summary report PDF
+        Create summary report PDF and CSV file for all sessions
 
         :param report_dir: str, report output directory in derivatives
-        :param metrics: list, session metric dictionaries including metadata
-        :param summary_months: int, number of past months to summarize
+        :param metrics_df: DataFrame, session metric dataframe
+        :param past_months: int, number of past months to summarize
         """
 
         # For datetime axis labeling without warnings
         register_matplotlib_converters()
 
+        # Add plot-friendly Date column
+        metrics_df['Date'] = [datetime.strptime(dt, '%Y-%m-%dT%H:%M:%S.%f')
+                              for dt in metrics_df['AcquisitionDateTime'].values]
+
+        # Metrics of interest to plot and save to CSV
+        self._metric_names = [
+            'SNR',
+            'SFNR',
+            'NoiseFloor',
+            'Drift',
+            'NyquistSpikes',
+            'AirSpikes'
+        ]
+
         self._report_dir = report_dir
-        self._metrics = metrics
-        self._subject = metrics[0]['Subject']
-        self._summary_months = summary_months
+        self._metrics_df = metrics_df
+        self._subject = metrics_df['Subject'][0]
+        self._past_months = past_months
         self._summary_pdf = os.path.join(report_dir, '{}_summary.pdf'.format(self._subject))
+        self._summary_csv = self._summary_pdf.replace('.pdf', '.csv')
+
+        # Identify outliers before generating plots and writing CSV
+        self._outliers()
+
+        #
+        # Summary PDF construction
+        #
 
         # Create working directory for images
         self._work_dir = tempfile.mkdtemp()
@@ -85,46 +110,15 @@ class SummaryPDF:
 
         self._init_pdf()
         self._add_coverpage()
-        self._add_metric_graphs('Noise')
-        self._add_metric_graphs('Spike/Drift')
+        self._add_metric_graphs()
 
         self._doc.build(self._contents)
 
         # Delete working directory
         shutil.rmtree(self._work_dir)
 
-    def _add_metric_graphs(self, metric='Noise'):
-        """
-        Add timecourse and histogram plots for the given metric class ('Noise' or 'Spike/Drift')
-        :return:
-        """
-
-        if 'Noise' in metric:
-            metric_list = [
-                'SNR',
-                'SFNR',
-                'NoiseFloor'
-            ]
-        elif 'Spike/Drift' in metric:
-            metric_list = [
-                'Drift',
-                'NyquistSpikes',
-                'AirSpikes'
-            ]
-        else:
-            print('* Unknown metric class : {:s} - skipping'.format(metric))
-            return
-
-        # Page break
-        self._contents.append(PageBreak())
-
-        ptext = '<font size=14><b>Session {:s}} Trends</b></font>'.format(metric)
-        self._contents.append(Paragraph(ptext, self._pstyles['Justify']))
-        self._contents.append(Spacer(1, 0.25 * inch))
-
-        trend_png_fname = self._plot_trends(metric_list)
-        trends_img = Image(trend_png_fname, 6.0 * inch, 6.0 * inch, hAlign='LEFT')
-        self._contents.append(trends_img)
+        # Finally write CSV for metrics of interest
+        self._write_csv()
 
     def _init_pdf(self):
 
@@ -152,7 +146,7 @@ class SummaryPDF:
         self._contents.append(Spacer(1, 0.1 * inch))
 
         # First session metadata - assume identical for all sessions
-        m = self._metrics[0]
+        m = self._metrics_df.iloc[0]
 
         meta = [['Subject', self._subject],
                 ['Scanner', m['StationName'] + ' ' + m['DeviceSerialNumber']],
@@ -162,41 +156,55 @@ class SummaryPDF:
         self._contents.append(Table(meta, hAlign='LEFT'))
         self._contents.append(Spacer(1, 0.25 * inch))
 
-    def _plot_trends(self, metric_list):
-        """
-        Generate a PNG of the trends and histogram for each of the passed metrics
+        ptext = '<font size=14><b>Potential Outlier Sessions</b></font>'
+        self._contents.append(Paragraph(ptext, self._pstyles['Justify']))
+        self._contents.append(Spacer(1, 0.1 * inch))
 
-        :param metric_list: str list
-            List of metrics to plots
+        ptext = '<font size=12>Identified by conservative DBSCAN clustering (epsilon = 1.5)</font>'
+        self._contents.append(Paragraph(ptext, self._pstyles['Justify']))
+        self._contents.append(Spacer(1, 0.1 * inch))
+
+        df = self._metrics_df[['Date', 'Outlier']]
+        meta = df[df['Outlier'] == 'Outlier'].values.tolist()
+        self._contents.append(Table(meta, hAlign='LEFT'))
+        self._contents.append(Spacer(1, 0.25 * inch))
+
+    def _add_metric_graphs(self):
+        """
+        Add timecourse and histogram plots for the given metric class ('Noise' or 'Spike/Drift')
         :return:
         """
 
-        n_metrics = len(metric_list)
+        # Page break
+        self._contents.append(PageBreak())
 
-        t = []
-        mm = []
+        ptext = '<font size=14><b>Session Metric Trends</b></font>'
+        self._contents.append(Paragraph(ptext, self._pstyles['Justify']))
+        self._contents.append(Spacer(1, 0.25 * inch))
 
-        for mt in self._metrics:
+        trend_png_fname = self._plot_trends()
+        trends_img = Image(trend_png_fname, 7.0 * inch, 9.0 * inch, hAlign='LEFT')
+        self._contents.append(trends_img)
 
-            if 'AcquisitionDateTime' in mt.keys():
-                dt = datetime.strptime(mt['AcquisitionDateTime'], '%Y-%m-%dT%H:%M:%S.%f')
-                t.append(dt)
-                mm.append([mt[m_name] for m_name in metric_list])
-            else:
-                print('* Acquisition time unknown - skipping')
+    def _plot_trends(self):
+        """
+        Generate a PNG of the trends and histogram for each of the passed metrics
+        :return:
+        """
 
-        t, mm = np.array(t), np.array(mm)
+        # Number of metrics to plot
+        n_metrics = len(self._metric_names)
 
-        # Output PNG filenames
+        # Output PNG filename
         png_fname = os.path.join(self._work_dir, 'metric_trends.png')
 
-        plt.figure(figsize=(16, 12))
-
+        # Setup plot grid
+        plt.figure(figsize=(14, 18))
         gs = gridspec.GridSpec(n_metrics, 2, width_ratios=[3, 1])
 
         # Fill each of the subplots
-        for mc, m_name in enumerate(metric_list):
-            metric_trend_plot(m_name, t, mm[:, mc], gridspec=gs[mc, :], past_months=24)
+        for mc, m_name in enumerate(self._metric_names):
+            metric_trend_plot(mc, m_name, self._metrics_df, gridspec=gs, past_months=self._past_months)
 
         # Tweak subplot margins and spacing
         plt.tight_layout()
@@ -205,3 +213,38 @@ class SummaryPDF:
         plt.savefig(png_fname, dpi=300)
 
         return png_fname
+
+    def _write_csv(self):
+
+        # Full column list including subject, session, date and metrics
+        cols_to_write = ['Subject', 'Session', 'Date'] + self._metric_names
+
+        print()
+        print('Writing metrics of interest to {:s}'.format(self._summary_csv))
+
+        self._metrics_df.to_csv(self._summary_csv,
+                                columns=cols_to_write,
+                                header=True,
+                                index=False)
+
+    def _outliers(self):
+        """
+        Identify within sample outliers using DBSCAN
+        Adds outlier flag column to metric DataFrame
+
+        :return:
+        """
+
+        n = len(self._metrics_df)
+
+        # DBSCAN clustering
+        X = np.array(self._metrics_df[self._metric_names])
+
+        # Standardize mean, sd to 0, 1
+        X = StandardScaler().fit_transform(X)
+
+        # Cluster using DBSCAN
+        clustering = DBSCAN(eps=1.5, min_samples=5).fit(X)
+
+        # Add boolean Outlier column to DataFrame
+        self._metrics_df['Outlier'] = ['Outlier' if l < 0 else 'Inlier' for l in clustering.labels_]
