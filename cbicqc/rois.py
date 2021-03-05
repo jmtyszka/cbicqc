@@ -137,7 +137,7 @@ def make_rois(labels_nii):
     # Construct 3D binary sphere structuring element
     k = generate_binary_structure(3, 2)  # 3D, 2-connected
 
-    # Erode signal mask x N, then dilate x 2N
+    # Erode signal mask n_iter times, then dilate 2*n_iter times
     n_iter = 2
     signal_mask_ero = binary_erosion(signal_mask, structure=k, iterations=n_iter)
     signal_mask_dil = binary_dilation(signal_mask_ero, structure=k, iterations=n_iter * 2)

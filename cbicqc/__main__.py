@@ -68,7 +68,10 @@ def main():
     print('BIDS Directory : {}'.format(bids_dir))
     print('Subject : {}'.format(subj_id if len(subj_id) > 0 else 'All Subjects'))
     print('Session : {}'.format(sess_id if len(sess_id) > 0 else 'All Sessions'))
-    print('Summary : {} months'.format(past_months))
+
+    # Long term summary relevent for phantom QC
+    if 'phantom' in mode:
+        print('Summary : {} months'.format(past_months))
 
     # Setup QC analysis
     qc = CBICQC(bids_dir=bids_dir, subject=subj_id, session=sess_id, mode=mode, past_months=past_months)
