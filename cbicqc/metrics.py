@@ -27,9 +27,9 @@ Copyright 2019 California Institute of Technology.
 import numpy as np
 
 
-def qc_metrics(fit_results, tsfnr_nii, rois_nii):
+def signal_metrics(fit_results, tsfnr_nii, rois_nii):
     """
-    Calculate QC metrics for each ROI
+    Calculate signal QC metrics for each ROI
 
     :param fit_results: list, fit objects from scipy least_squares
     :return metrics:, dict, QC metric results dictionary
@@ -100,11 +100,85 @@ def spike_count(points, thresh=3.5):
 
 
 def calc_tsfnr(tsfnr_nii, rois_nii):
+    """
+    ROI Label Key
+    ----
+    Undefined       = 0
+    Air Space       = 1
+    Nyquist Ghost   = 2
+    Signal          = 3
+
+    :param tsfnr_nii:
+    :param rois_nii:
+    :return:
+    """
 
     tsfnr_img = tsfnr_nii.get_data()
     rois_img = rois_nii.get_data()
 
-    return np.mean(tsfnr_img[rois_img == 1])
+    return np.mean(tsfnr_img[rois_img == 3])
+
+
+def moco_metrics(moco_pars):
+
+    # Calculate framewise displacement timecourse from moco_pars
+    fd = calc_fd(moco_pars)
+
+    # Create and fill metrics dictionary
+    metrics = dict()
+
+    metrics['MeanFD'] = fd.mean()
+    metrics['MaxFD'] = fd.max()
+
+    return metrics
+
+
+def calc_fd(mcf):
+    """
+    Calculate conventional FD from 6-column FSL MCFLIRT motion parameters
+
+    Reference:
+    J. D. Power, K. A. Barnes, A. Z. Snyder, B. L. Schlaggar, and S. E. Petersen,
+    “Spurious but systematic correlations in functional connectivity MRI networks arise from subject motion,”
+    Neuroimage, vol. 59, pp. 2142–2154, Feb. 2012, doi: 10.1016/j.neuroimage.2011.10.018. [Online].
+    Available: http://dx.doi.org/10.1016/j.neuroimage.2011.10.018
+    """
+
+    # Rotations (radians)
+    rx = mcf[:, 0]
+    ry = mcf[:, 1]
+    rz = mcf[:, 2]
+
+    # Translations (mm)
+    tx = mcf[:, 3]
+    ty = mcf[:, 4]
+    tz = mcf[:, 5]
+
+    # Backward differences (forward difference + leading 0)
+
+    drx = np.insert(np.diff(rx), 0, 0)
+    dry = np.insert(np.diff(ry), 0, 0)
+    drz = np.insert(np.diff(rz), 0, 0)
+
+    dtx = np.insert(np.diff(tx), 0, 0)
+    dty = np.insert(np.diff(ty), 0, 0)
+    dtz = np.insert(np.diff(tz), 0, 0)
+
+    # Total framewise displacement (Power 2012)
+
+    r_sphere = 50.0  # mm
+
+    FD = (np.abs(dtx) +
+          np.abs(dty) +
+          np.abs(dtz) +
+          np.abs(r_sphere * drx) +
+          np.abs(r_sphere * dry) +
+          np.abs(r_sphere * drz)
+          )
+
+    return FD
+
+
 
 
 

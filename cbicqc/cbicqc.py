@@ -53,7 +53,7 @@ from .graphics import (plot_roi_timeseries, plot_roi_powerspec,
                        orthoslices,
                        roi_demeaned_ts)
 from .rois import register_template, make_rois
-from .metrics import qc_metrics
+from .metrics import signal_metrics, moco_metrics
 from .moco import moco_phantom, moco_live
 from .report import ReportPDF
 from .summary import Summarize
@@ -115,7 +115,7 @@ class CBICQC:
     def run(self):
 
         print('')
-        print('Starting CBIC QC analysis')
+        print('Starting CBIC EPI Timeseries QC analysis')
         print('')
 
         # Get complete list of EPI time series for this subject
@@ -165,7 +165,7 @@ class CBICQC:
         # Convert metric list to dataframe and save to file
         self._metrics_df = pd.DataFrame(metric_list)
 
-        # Generate summary report for QC phantoms
+        # Generate summary report for phantom QC only
         if 'phantom' in self._mode:
             Summarize(self._report_dir, self._metrics_df, self._past_months)
 
@@ -179,7 +179,7 @@ class CBICQC:
 
         # Load EPI timeseries image
         print('      Loading EPI timeseries image')
-        qc_nii = nb.load(img_fname)
+        epits_nii = nb.load(img_fname)
 
         # Load metadata if available
         print('      Loading QC metadata')
@@ -204,19 +204,23 @@ class CBICQC:
         # Integrate additional meta data from Nifti header and filename
         meta['Subject'] = self._this_subject
         meta['Session'] = self._this_session
-        meta['VoxelSize'] = ' x '.join(str(x) for x in qc_nii.header.get('pixdim')[1:4])
-        meta['MatrixSize'] = ' x '.join(str(x) for x in qc_nii.shape)
+        meta['VoxelSize'] = ' x '.join(str(x) for x in epits_nii.header.get('pixdim')[1:4])
+        meta['MatrixSize'] = ' x '.join(str(x) for x in epits_nii.shape)
 
-        # Perform rigid body motion correction on in vivo QC series
+        # Perform rigid body motion correction on EPI timeseries
+
+        # Hardwired moco flag for debugging
+        skip_moco = False
+
         print('      Starting {} motion correction'.format(self._mode))
         t0 = dt.datetime.now()
-        qc_moco_nii, qc_moco_pars = self._moco(qc_nii, skip=False)
+        epits_moco_nii, epits_moco_pars = self._moco(epits_nii, skip=skip_moco)
         t1 = dt.datetime.now()
         print('      Completed motion correction in {} seconds'.format((t1 - t0).seconds))
 
         # Temporal mean and sd images
         print('      Calculating temporal mean image')
-        tmean_nii, tsd_nii, tsfnr_nii = temporal_mean_sd(qc_moco_nii)
+        tmean_nii, tsd_nii, tsfnr_nii = temporal_mean_sd(epits_moco_nii)
 
         # Register labels to temporal mean via template image
         print('      Register labels to temporal mean image')
@@ -228,16 +232,19 @@ class CBICQC:
 
         # Extract ROI time series
         print('      Extracting ROI time series')
-        s_mean_t = extract_timeseries(qc_moco_nii, rois_nii)
+        s_mean_t = extract_timeseries(epits_moco_nii, rois_nii)
 
         # Detrend time series
         print('      Detrending time series')
-        fit_results, s_detrend_t = detrend_timeseries(s_mean_t)
+        fit_results, s_detrend_t, s_fit_t = detrend_timeseries(s_mean_t)
 
-        # Calculate QC metrics
-        metrics = qc_metrics(fit_results, tsfnr_nii, rois_nii)
+        # Calculate signal metrics
+        metrics = signal_metrics(fit_results, tsfnr_nii, rois_nii)
 
-        # Merge meta data into metrics dictionary for report JSON sidecar
+        # Add motion metrics to metrics dictionary
+        metrics.update(moco_metrics(epits_moco_pars))
+
+        # Add image meta data into metrics dictionary
         metrics.update(meta)
 
         # Time vector (seconds)
@@ -246,14 +253,14 @@ class CBICQC:
         print('      Generating Report')
 
         # Create report images
-        plot_roi_timeseries(t, s_mean_t, s_detrend_t, self._roi_ts_png)
+        plot_roi_timeseries(t, s_mean_t, s_detrend_t, s_fit_t, self._roi_ts_png)
         plot_roi_powerspec(t, s_detrend_t, self._roi_ps_png)
-        plot_mopar_timeseries(t, qc_moco_pars, self._mopar_ts_png)
-        plot_mopar_powerspec(t, qc_moco_pars, self._mopar_pspec_png)
-        roi_demeaned_ts(qc_moco_nii, rois_nii, self._rois_demeaned_png)
+        plot_mopar_timeseries(t, epits_moco_pars, self._mopar_ts_png)
+        plot_mopar_powerspec(t, epits_moco_pars, self._mopar_pspec_png)
+        roi_demeaned_ts(epits_moco_nii, rois_nii, self._rois_demeaned_png)
         orthoslices(tmean_nii, self._tmean_montage_png, cmap='gray', irng='robust')
         orthoslices(tsd_nii, self._tsd_montage_png, cmap='viridis', irng='robust')
-        orthoslices(rois_nii, self._rois_montage_png, cmap='tab20', irng='noscale')
+        orthoslices(rois_nii, self._rois_montage_png, cmap='Pastel1', irng='noscale')
 
         # OPTIONAL: Save intermediate images
         if self._save_intermediates:

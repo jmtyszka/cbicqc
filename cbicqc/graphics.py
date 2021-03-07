@@ -26,8 +26,6 @@ Copyright 2019 California Institute of Technology.
 
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
-import matplotlib.gridspec as gridspec
 
 from scipy.signal import periodogram
 from skimage.util import montage
@@ -38,12 +36,13 @@ from datetime import date
 from .moco import total_rotation
 
 
-def plot_roi_timeseries(t, s_mean_t, s_detrend_t, plot_fname):
+def plot_roi_timeseries(t, s_mean_t, s_fit_t, s_detrend_t, plot_fname):
     """
-    Plot spatial mean ROI signal vs time
+    Plot spatial mean ROI signals vs time
 
     :param t: float array, time vector (s)
     :param s_mean_t:
+    :param s_fit_t:
     :param s_detrend_t:
     :param plot_fname:
     :return:
@@ -51,16 +50,20 @@ def plot_roi_timeseries(t, s_mean_t, s_detrend_t, plot_fname):
 
     roi_names = ['Air', 'Nyquist Ghost', 'Signal']
 
-    plt.subplots(3, 1, figsize=(10, 5))
+    fig, axs = plt.subplots(3, 1, figsize=(10, 5))
 
     for lc in range(0, 3):
 
-        plt.subplot(3, 1, lc+1)
-        plt.plot(t, s_mean_t[lc, :], t, s_detrend_t[lc, :])
-        plt.title(roi_names[lc], loc='left')
+        axs[lc].plot(t, s_mean_t[lc, :], label='Raw')
+        axs[lc].plot(t, s_detrend_t[lc, :], label='Model')
+        axs[lc].plot(t, s_fit_t[lc, :], label='Detrended')
+        axs[lc].set_title(roi_names[lc], loc='left')
 
     # Add x label to final subplot
-    plt.xlabel('Time (s)')
+    axs[2].set_xlabel('Time (s)')
+
+    handles, labels = axs[2].get_legend_handles_labels()
+    fig.legend(handles, labels, loc='upper center', ncol=3)
 
     # Space subplots without title overlap
     plt.tight_layout()
@@ -130,6 +133,7 @@ def plot_mopar_timeseries(t, mopars, plot_fname):
     mopars columns: (dx, dy, dz, rx, ry, rz)
     Displacements in mm, rotations in degrees
 
+    :param t: float array, nt x 1 time vector
     :param mopars: float array, nt x 6 motion parameters [rx, ry, rz, dx, dy, dz]
     :param plot_fname: str, output plot filename
     :return:
@@ -224,8 +228,6 @@ def plot_mopar_powerspec(t, mopars, plot_fname):
 
 def orthoslices(img_nii, ortho_fname, cmap='viridis', irng='default'):
 
-    orient_name = ['Axial', 'Coronal', 'Sagittal']
-
     img3d = img_nii.get_data()
 
     # Intensity scaling
@@ -237,27 +239,49 @@ def orthoslices(img_nii, ortho_fname, cmap='viridis', irng='default'):
     else:
         vmin, vmax = np.min(img3d), np.max(img3d)
 
-    plt.subplots(1, 3, figsize=(7, 2.4))
+    fig, axs = plt.subplots(1, 3, figsize=(7, 2.4), constrained_layout=True)
 
-    for ax in [0, 1, 2]:
+    nx, ny, nz = img3d.shape
+    hx, hy, hz = int(nx/2), int(ny/2), int(nz/2)
 
-        # Transpose dimensions for given orientation
-        ax_order = np.roll([2, 0, 1], ax)
-        img3d_t = np.transpose(img3d, ax_order)
+    # Extract central section for each orientation
+    # Assumes RAS orientation
+    m_sag = img3d[hx, :, :].transpose()
+    m_cor = img3d[:, hy, :].transpose()
+    m_tra = img3d[:, :, hz].transpose()
 
-        # Extract central section in first dimension
-        m2d = img3d_t[int(img3d_t.shape[0]/2), :, :]
+    # Use transverse image for colorbar reference
+    trafig = axs[0].imshow(
+        m_tra,
+        cmap=plt.get_cmap(cmap),
+        vmin=vmin, vmax=vmax,
+        aspect='equal',
+        origin='lower'
+    )
+    axs[0].set_title('Transverse')
+    axs[0].axis('off')
 
-        plt.subplot(1, 3, ax+1)
-        plt.imshow(m2d,
-                   cmap=plt.get_cmap(cmap),
-                   vmin=vmin, vmax=vmax,
-                   aspect='equal',
-                   origin='lower')
-        plt.title(orient_name[ax])
+    axs[1].imshow(
+        m_cor,
+        cmap=plt.get_cmap(cmap),
+        vmin=vmin, vmax=vmax,
+        aspect='equal',
+        origin='lower'
+    )
+    axs[1].set_title('Coronal')
+    axs[1].axis('off')
 
-        plt.axis('off')
-        plt.subplots_adjust(bottom=0.0, top=0.9, left=0.0, right=1.0)
+    axs[2].imshow(
+        m_sag,
+        cmap=plt.get_cmap(cmap),
+        vmin=vmin, vmax=vmax,
+        aspect='equal',
+        origin='lower'
+    )
+    axs[2].set_title('Sagittal')
+    axs[2].axis('off')
+
+    plt.colorbar(trafig, ax=axs, location='right', shrink=0.75)
 
     # Save plot to file
     plt.savefig(ortho_fname, dpi=300)
@@ -343,11 +367,13 @@ def roi_demeaned_ts(img_nii, rois_nii, residuals_fname):
     # Number of time points and labels
     nt = s.shape[3]
 
-    plt.subplots(3, 1, figsize=(7, 9))
+    fig, axs = plt.subplots(3, 1, figsize=(7, 9))
+    fig.subplots_adjust(left=0.02, bottom=0.06, right=0.95, top=0.94, wspace=0.05)
 
-    for lc in range(1, 4):
+    for lc in range(3):
 
-        mask3d = np.array(rois == lc)
+        # Skip label 0 - use lc+1 to index ROI labels
+        mask3d = np.array(rois == (lc+1))
         mask4d = np.tile(mask3d[:, :, :, np.newaxis], (1, 1, 1, nt))
 
         nx = np.sum(mask3d)
@@ -362,20 +388,25 @@ def roi_demeaned_ts(img_nii, rois_nii, residuals_fname):
         row_means = np.mean(s_xt_d, axis=1)
         res = s_xt_d.astype(np.float64) - np.tile(row_means[:, np.newaxis], (1, nt))
 
+        # Find abs max of residual
+        amax = np.abs(res).max()
+
         # Plot graymap
-        plt.subplot(3, 1, lc)
-        plt.imshow(res,
-                   cmap=plt.get_cmap('viridis'),
-                   aspect='auto',
-                   origin='upper'
+        pobj = axs[lc].imshow(
+            res,
+            vmin=-amax,
+            vmax=amax,
+            cmap=plt.get_cmap('viridis'),
+            aspect='auto',
+            origin='upper'
         )
 
-        plt.title(roi_name[lc-1])
+        fig.colorbar(pobj, ax=axs[lc])
 
-        plt.axis('off')
-        plt.subplots_adjust(bottom=0.0, top=0.9, left=0.0, right=1.0)
+        axs[lc].set_title(roi_name[lc])
+        axs[lc].set_axis_off()
 
-    # Remove excess space
+    # Adjust space around plots
     plt.tight_layout()
 
     # Save plot to file
@@ -452,5 +483,3 @@ def metric_trend_plot(mc, metric_name, metrics_df, gridspec, past_months=12):
     ax0.xaxis.set_ticks_position('bottom')
     ax1.axis('off')
     ax1.set_title('')
-
-

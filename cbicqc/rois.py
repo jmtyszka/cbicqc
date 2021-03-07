@@ -60,6 +60,10 @@ def register_template(tmean_nii, work_dir, mode='phantom'):
     nb.save(tmean_nii, tmean_fname)
 
     # Link appropriate template for mode
+    # Template labels should be:
+    # 0 : background air volume
+    # 1 : padding between signal and air/ghost volumes
+    # 2 : signal volume
     if 'phantom' in mode:
         dof = 6
         template_fname = pkg_resources.resource_filename(
@@ -74,11 +78,11 @@ def register_template(tmean_nii, work_dir, mode='phantom'):
         dof = 12
         template_fname = pkg_resources.resource_filename(
             __name__,
-            os.path.join('templates', 'MNI152_T1_2mm.nii.gz')
+            os.path.join('templates', 'mni_template.nii.gz')
         )
         labels_fname = pkg_resources.resource_filename(
             __name__,
-            os.path.join('templates', 'MNI-maxprob-thr25-2mm.nii.gz')
+            os.path.join('templates', 'mni_labels.nii.gz')
         )
 
     template_xfm_fname = os.path.join(work_dir, 'template_xfm.nii.gz')
@@ -120,7 +124,7 @@ def register_template(tmean_nii, work_dir, mode='phantom'):
 
 def make_rois(labels_nii):
     """
-    Organize labels and add air space and Nyquist ROIs
+    Create ROI masks for unique air, ghost and signal volumes
 
     :param labels_nii: Nifti object,
         Raw labels in subject space
@@ -128,36 +132,28 @@ def make_rois(labels_nii):
         Integer ROI image include air and Nyquist ghost
     """
 
-    # Extract label image
+    # Extract integer-valued label image
     labels_img = labels_nii.get_data().astype(np.uint)
 
-    # Create signal mask from sum of all ROI labels
-    signal_mask = labels_img > 0
+    buffer_mask = (labels_img > 0).astype(np.uint8)
+    signal_mask = (labels_img > 1).astype(np.uint8)
 
-    # Construct 3D binary sphere structuring element
-    k = generate_binary_structure(3, 2)  # 3D, 2-connected
-
-    # Erode signal mask n_iter times, then dilate 2*n_iter times
-    n_iter = 2
-    signal_mask_ero = binary_erosion(signal_mask, structure=k, iterations=n_iter)
-    signal_mask_dil = binary_dilation(signal_mask_ero, structure=k, iterations=n_iter * 2)
-
-    # Create Nyquist mask by rolling eroded signal mask by FOVy/2
+    # Create Nyquist mask by rolling signal mask by FOVy/2
     ny = signal_mask.shape[1]
-    nyquist_mask = np.roll(signal_mask_ero, int(ny / 2), axis=1)
+    nyquist_mask = np.roll(signal_mask, int(ny / 2), axis=1)
 
-    # Exclusive Nyquist ghost mask (remove overlap with dilated signal mask)
-    nyquist_only_mask = np.logical_and(nyquist_mask, np.logical_not(np.logical_and(nyquist_mask, signal_mask_dil))).astype(np.uint)
+    # Remove buffer mask from Nyquist ghost mask
+    nyquist_only_mask = nyquist_mask * (1 - buffer_mask)
 
     # Create air mask
-    air_mask = (1 - signal_mask_dil - nyquist_only_mask).astype(np.uint)
+    air_mask = (1 - buffer_mask) - nyquist_only_mask
 
     # Finally merge all masks into an ROI label file
     # Undefined       = 0
     # Air Space       = 1
     # Nyquist Ghost   = 2
-    # Other ROIs      = 3, 4, 5, ...
-    rois = air_mask + 2 * nyquist_only_mask + labels_img + 2 * signal_mask
+    # Signal          = 3
+    rois = air_mask + 2 * nyquist_only_mask + 3 * signal_mask
 
     # Wrap image in a Nifti object
     rois_nii = nb.Nifti1Image(rois, labels_nii.affine)

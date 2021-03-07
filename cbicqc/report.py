@@ -157,6 +157,7 @@ class ReportPDF:
         self._contents.append(signal_table)
         self._contents.append(Spacer(1, 0.25 * inch))
 
+        # Add noise metrics subsection
         noise_metrics = [['Noise Sigma', '{:.1f}'.format(self._metrics['NoiseSigma'])],
                          ['Noise Floor', '{:.1f}'.format(self._metrics['NoiseFloor'])],
                          ['Signal Spikes', '{}'.format(self._metrics['SignalSpikes'])],
@@ -171,6 +172,18 @@ class ReportPDF:
         self._contents.append(noise_table)
         self._contents.append(Spacer(1, 0.25 * inch))
 
+        # Add motion metrics subsection
+        motion_metrics = [['Mean FD', '{:0.3f} mm'.format(self._metrics['MeanFD'])],
+                          ['Max FD', '{:0.3f} mm'.format(self._metrics['MaxFD'])]]
+
+        ptext = '<font size=11><b>Motion</b></font>'
+        self._contents.append(Paragraph(ptext, self._pstyles['Justify']))
+        self._contents.append(Spacer(1, 0.1 * inch))
+
+        motion_table = Table(motion_metrics, hAlign='LEFT')
+        self._contents.append(motion_table)
+        self._contents.append(Spacer(1, 0.25 * inch))
+
     def _add_roi_timeseries(self):
 
         # Page break
@@ -182,22 +195,21 @@ class ReportPDF:
 
         ptext = '<font size=14><b>ROI Spatial Mean Timeseries</b></font>'
         self._contents.append(Paragraph(ptext, self._pstyles['Justify']))
-        self._contents.append(Spacer(1, 0.25 * inch))
+        self._contents.append(Spacer(1, 0.2 * inch))
 
         ptext = """
         <font size=11>
-        These three graphs show the spatial mean signal intensity within the main signal, Nyquist ghost and air
-        space regions of interest (ROIs). The blue line is the raw spatial mean intensity and the orange line
-        has been detrended with an exponential + linear model. 
+        These three graphs show the spatial mean signal intensity within the air space, Nyquist ghost and main signal
+        regions of interest (ROIs). A robust least-squares exponential + linear model is used for detrending. 
         </font>
         """
         self._contents.append(Paragraph(ptext, self._pstyles['Justify']))
-        self._contents.append(Spacer(1, 0.1 * inch))
+        self._contents.append(Spacer(1, 0.2 * inch))
 
         roi_ts_img = Image(self._fnames['ROITimeseries'], 7.0 * inch, 3.5 * inch, hAlign='LEFT')
         self._contents.append(roi_ts_img)
 
-        self._contents.append(Spacer(1, 0.5 * inch))
+        self._contents.append(Spacer(1, 0.2 * inch))
 
         #
         # ROI Spatial Mean Power Spectrum
@@ -205,21 +217,21 @@ class ReportPDF:
 
         ptext = '<font size=14><b>ROI Power Spectra</b></font>'
         self._contents.append(Paragraph(ptext, self._pstyles['Justify']))
-        self._contents.append(Spacer(1, 0.25 * inch))
+        self._contents.append(Spacer(1, 0.2 * inch))
 
         ptext = """
         <font size=11>
-        Power spectrum of the spatial mean signal in each ROI. The dB scale is relative to maximum spectral power.
+        Power spectrum of the spatial mean signal in each ROI.
+        dB scale referenced to maximum spectral power.
         </font>
         """
         self._contents.append(Paragraph(ptext, self._pstyles['Justify']))
-        self._contents.append(Spacer(1, 0.1 * inch))
+        self._contents.append(Spacer(1, 0.2 * inch))
 
         roi_ps_img = Image(self._fnames['ROIPowerspec'], 7.0 * inch, 3.5 * inch, hAlign='LEFT')
         self._contents.append(roi_ps_img)
 
-        self._contents.append(Spacer(1, 0.5 * inch))
-
+        self._contents.append(Spacer(1, 0.2 * inch))
 
     def _add_motion_timeseries(self):
 
@@ -232,7 +244,7 @@ class ReportPDF:
 
         ptext = '<font size=14><b>Motion Parameter Timeseries</b></font>'
         self._contents.append(Paragraph(ptext, self._pstyles['Justify']))
-        self._contents.append(Spacer(1, 0.25 * inch))
+        self._contents.append(Spacer(1, 0.2 * inch))
 
         # Main signal QC specific text
         ptext = """
@@ -242,12 +254,12 @@ class ReportPDF:
         </font>
         """
         self._contents.append(Paragraph(ptext, self._pstyles['Justify']))
-        self._contents.append(Spacer(1, 0.1 * inch))
+        self._contents.append(Spacer(1, 0.2 * inch))
 
         mo_ts_img = Image(self._fnames['MoparTimeseries'], 7.0 * inch, 3.5 * inch, hAlign='LEFT')
         self._contents.append(mo_ts_img)
 
-        self._contents.append(Spacer(1, 0.5 * inch))
+        self._contents.append(Spacer(1, 0.2 * inch))
 
         #
         # Motion Power Spectra
@@ -255,21 +267,21 @@ class ReportPDF:
 
         ptext = '<font size=14><b>Motion Power Spectra</b></font>'
         self._contents.append(Paragraph(ptext, self._pstyles['Justify']))
-        self._contents.append(Spacer(1, 0.25 * inch))
+        self._contents.append(Spacer(1, 0.2 * inch))
 
         ptext = """
         <font size=11>
         Power spectrum of the absolute displacement and total rotation timecourses.
-        The dB scale is relative to maximum spectral power.
+        dB scale referenced to maximum spectral power.
         </font>
         """
         self._contents.append(Paragraph(ptext, self._pstyles['Justify']))
-        self._contents.append(Spacer(1, 0.1 * inch))
+        self._contents.append(Spacer(1, 0.2 * inch))
 
         mo_ts_img = Image(self._fnames['MoparPowerspec'], 7.0 * inch, 3.5 * inch, hAlign='LEFT')
         self._contents.append(mo_ts_img)
 
-        self._contents.append(Spacer(1, 0.5 * inch))
+        self._contents.append(Spacer(1, 0.2 * inch))
 
     def _add_sections(self):
 
@@ -306,7 +318,7 @@ class ReportPDF:
 
         ptext = """
         <font size=11>
-        Demeaned signal timecourses for a subsample of voxels from each ROI.
+        Demeaned signal timecourses for a subsample of 200 voxels from each ROI.
         </font>
         """
         self._contents.append(Paragraph(ptext, self._pstyles['Justify']))
@@ -323,5 +335,3 @@ class ReportPDF:
         # Save metrics in derivatives as JSON file
         with open(self._fnames['ReportJSON'], 'w') as fd:
             json.dump(self._metrics, fd, sort_keys=True, indent=4)
-
-
