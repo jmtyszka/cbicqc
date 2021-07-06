@@ -167,7 +167,18 @@ class CBICQC:
 
         # Generate summary report for phantom QC only
         if 'phantom' in self._mode:
-            Summarize(self._report_dir, self._metrics_df, self._past_months)
+
+            # Check for deidentified BIDS data
+            # dcm2niix with anonymization on by default generates AcquisitionTime but not AcquisitionDateTime
+            # Use "bidskit --no-anon" to skip deidentification and generate AcquisitionDataTime in the JSON sidecars
+            if 'AcquisitionDateTime' in self._metrics_df:
+                Summarize(self._report_dir, self._metrics_df, self._past_months)
+            else:
+                print('')
+                print('* AcquisitionDateTime is missing from the BIDS metadata')
+                print('* The most likely cause of this is deidentification of the data by dcm2niix or bidskit')
+                print('* A QC trend summary cannot be generated from deidentified data')
+
 
         # Cleanup temporary QC directory
         self.cleanup()
