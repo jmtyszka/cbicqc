@@ -31,9 +31,11 @@ import nibabel as nb
 
 def temporal_mean_sd(qc_moco_nii):
 
+    qc = qc_moco_nii.get_data()
+
     # Temporal mean of 4D timeseries
-    tmean = np.mean(qc_moco_nii.get_data(), axis=3)
-    tsd = np.std(qc_moco_nii.get_data(), axis=3)
+    tmean = np.mean(qc, axis=3)
+    tsd = np.std(qc, axis=3)
     tsfnr = tmean / (tsd + np.finfo(float).eps)
 
     tmean_nii = nb.Nifti1Image(tmean, qc_moco_nii.affine)
@@ -77,15 +79,20 @@ def detrend_timeseries(s_mean_t):
     :return:
     """
 
+    np.savetxt("/Users/jmt/sandbox/s_mean_t.csv", s_mean_t, delimiter=",")
+
+    # Mean label ROI signal (n_labels x n_timepoints)
     nl, nt = s_mean_t.shape
 
     # Time vector
     t = np.arange(0, nt)
 
     s_detrend_t = np.zeros_like(s_mean_t)
+    s_fit_t = np.zeros_like(s_mean_t)
 
     fit_results = []
 
+    # Loop over each label ROI mean timeseries
     for lc in range(0, nl):
 
         s_t = s_mean_t[lc, :]
@@ -93,9 +100,10 @@ def detrend_timeseries(s_mean_t):
         s_min, s_max, s_mean = np.min(s_t), np.max(s_t), np.mean(s_t)
         s_rng = s_max - s_min
 
-        x0 = [s_rng, 5, -s_rng / nt, s_mean]
-        bounds = ([0,      0, -np.inf,      0],
-                  [s_rng, nt,       0, np.inf])
+        # [Exp Amp, Exp Tau, Linear slope, Offset]
+        x0 = [s_rng, 1, -s_rng / float(nt), s_mean]
+        bounds = ([0.0, 0, -np.inf, 0],
+                  [s_rng, nt, np.inf, np.inf])
 
         # Robust non-linear curve fit (Huber loss function)
         result = least_squares(explin, x0,
@@ -104,15 +112,15 @@ def detrend_timeseries(s_mean_t):
                                bounds=bounds,
                                args=(t, s_t))
 
-        # Fitted curve
-        s_fit = explin(result.x, t, 0)
+        # Fitted curve - note sign change from residual definition
+        s_fit_t[lc, :] = -explin(result.x, t, 0)
 
-        # Add fit residual to temporal mean - detrended timeseries
-        s_detrend_t[lc, :] = s_mean + result.fun
+        # Detrended timeseries = y_fit(t) - y(t) + mean(y(t))
+        s_detrend_t[lc, :] = result.fun + s_mean
 
         fit_results.append(result)
 
-    return fit_results, s_detrend_t
+    return fit_results, s_detrend_t, s_fit_t
 
 
 def explin(x, t, y):
@@ -129,79 +137,6 @@ def explin(x, t, y):
     :return: array, residuals
     """
 
-    return x[0] * np.exp(-t / x[1]) + x[2] * t + x[3] - y
+    y_fit = x[0] * np.exp(-t / x[1]) + x[2] * t + x[3]
 
-#     # Residual Gaussian sigma estimation
-#     # Assumes Gaussian white noise + sparse outlier spikes
-#     # Use robust estimate of residual sd (MAD * 1.4826)
-#     phantom_res_sigma = np.median(np.abs(phantom_res)) * 1.4826
-#     nyquist_res_sigma = np.median(np.abs(nyquist_res)) * 1.4826
-#     noise_res_sigma = np.median(np.abs(noise_res)) * 1.4826
-#
-#     # Count spikes, defined as residuals more than 5 SD from zero
-#     phantom_spikes = (np.abs(phantom_res) > 5 * phantom_res_sigma).sum()
-#     nyquist_spikes = (np.abs(nyquist_res) > 5 * nyquist_res_sigma).sum()
-#     noise_spikes = (np.abs(noise_res) > 5 * noise_res_sigma).sum()
-#
-#     # Calculate percent drift over course of acquisition (use fitted curve)
-#     phantom_drift = (phantom_fit[nv - 1] - phantom_fit[0]) / phantom_fit[0] * 100.0
-#     nyquist_drift = (nyquist_fit[nv - 1] - nyquist_fit[0]) / nyquist_fit[0] * 100.0
-#     noise_drift = (noise_fit[nv - 1] - noise_fit[0]) / noise_fit[0] * 100.0
-#
-#     # Append mean, spike count, drift to fit parameters
-#     phantom_opt = np.append(phantom_opt, [phantom_mean, phantom_spikes, phantom_drift])
-#     nyquist_opt = np.append(nyquist_opt, [nyquist_mean, nyquist_spikes, nyquist_drift])
-#     noise_opt = np.append(noise_opt, [noise_mean, noise_spikes, noise_drift])
-#
-#     # SNR relative to mean noise
-#     # Estimate spatial noise sigma (assuming underlying Gaussian and Half-Normal distribution)
-#     # sigma = mean(noise) * sqrt(pi/2)
-#     # See for example http://en.wikipedia.org/wiki/Half-normal_distribution
-#
-#     noise_sigma = noise_mean * sqrt(pi / 2)
-#     phantom_snr = phantom_mean / noise_sigma
-#     nyquist_snr = nyquist_mean / noise_sigma
-#
-#     # Generate detrended timeseries - add back constant offset for each ROI
-#     phantom_0 = phantom_res + phantom_mean
-#     nyquist_0 = nyquist_res + nyquist_mean
-#     noise_0 = noise_res + noise_mean
-#
-#     # Create array with detrended timeseries in columns (for output by np.savetxt)
-#     ts_detrend = np.array([phantom_0, nyquist_0, noise_0])
-#     ts_detrend = ts_detrend.transpose()
-#
-#     # Create array with timeseries detrend parameters in rows for each model
-#     # Parameter order : Exp amp, Exp tau, linear, const, spike count
-#     stats_pars = np.row_stack([phantom_opt, nyquist_opt, noise_opt])
-#
-#     #
-#     # Apparent motion parameters
-#     #
-#     print('    Analyzing motion parameters')
-#     qc_mcf_parfile = os.path.join(qc_dir, 'qc_mcf.par')
-#
-#     if not os.path.isfile(qc_mcf_parfile):
-#         print(qc_mcf_parfile + ' does not exist - exiting')
-#         sys.exit(0)
-#
-#     # N x 6 array (6 motion parameters in columns)
-#     x = np.loadtxt(qc_mcf_parfile)
-#
-#     # Extract displacement timeseries for each axis
-#     dx = x[:, 3]
-#     dy = x[:, 4]
-#     dz = x[:, 5]
-#
-#     # Calculate max absolute displacements (in microns) for each axis
-#     max_adx = (np.abs(dx)).max() * 1000.0
-#     max_ady = (np.abs(dy)).max() * 1000.0
-#     max_adz = (np.abs(dz)).max() * 1000.0
-#
-#     #
-#     # Finalize stats array for writing
-#     #
-
-
-
-
+    return y - y_fit

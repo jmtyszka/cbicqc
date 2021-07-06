@@ -45,7 +45,7 @@ setup(
     # For a discussion on single-sourcing the version across setup.py and the
     # project code, see
     # https://packaging.python.org/en/latest/single_source_version.html
-    version='2020.12.02',  # Required
+    version='2021.3.5',  # Required
 
     # This is a one-line description or tagline of what your project does. This
     # corresponds to the "Summary" metadata field:
@@ -153,7 +153,8 @@ setup(
                       'reportlab',
                       'scikit-image',
                       'statsmodels>=0.9.0',
-                      'pynetdicom>=1.2.0'],  # Optional
+                      'pynetdicom>=1.2.0',
+                      'pandas'],  # Optional
 
     # List additional groups of dependencies here (e.g. development
     # dependencies). Users will be able to install these using the "extras"
@@ -171,7 +172,7 @@ setup(
     # If there are data files included in your packages that need to be
     # installed, specify them here.
     package_data={
-        'cbicqc': ['templates/*.nii.gz'],
+        'cbicqc': ['templates/*'],
     },
 
     # Although 'package_data' is the preferred approach, in some case you may

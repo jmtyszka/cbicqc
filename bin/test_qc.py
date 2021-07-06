@@ -39,12 +39,11 @@ from cbicqc.cbicqc import CBICQC
 
 
 def main():
-
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Lightweight daily phantom QC analysis and reporting')
     parser.add_argument('-d', '--dir', default='.', help='BIDS QC dataset directory')
     parser.add_argument('-m', '--mode', default='phantom', help="QC Mode (phantom or live)")
-    parser.add_argument('-p', '--past', default=12, help='Number of past months to summarize [12]')
+    parser.add_argument('-p', '--past', default=12, type=int, help='Number of past months to summarize [12]')
     parser.add_argument('--sub', default='', help='Subject ID')
     parser.add_argument('--ses', default='', help='Session ID')
 
@@ -67,9 +66,9 @@ def main():
     print('Version : {}'.format(ver))
     print('')
     print('BIDS Directory : {}'.format(bids_dir))
-    print('Subject     : {:s}'.format(subj_id if len(subj_id) > 0 else 'All Subjects'))
-    print('Session     : {:s}'.format(sess_id if len(sess_id) > 0 else 'All Sessions'))
-    print('Past months : {:d}'.format(past_months))
+    print('Subject : {}'.format(subj_id if len(subj_id) > 0 else 'All Subjects'))
+    print('Session : {}'.format(sess_id if len(sess_id) > 0 else 'All Sessions'))
+    print('Summary : {} months'.format(past_months))
 
     # Setup QC analysis
     qc = CBICQC(bids_dir=bids_dir, subject=subj_id, session=sess_id, mode=mode, past_months=past_months)

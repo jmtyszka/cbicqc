@@ -3,7 +3,7 @@
 Essential quality control analysis of routine phantom stability MRI with single session and trend reporting
 
 ## Current Version ##
-2020.12.02
+2020.12.6
 
 ## Dependencies
 | Package | Minimum Version |
@@ -21,5 +21,8 @@ Essential quality control analysis of routine phantom stability MRI with single 
 
 ## Installation
 
-```pip3 install cbicqc```  
+#### PyPi installation
+```pip3 install cbicqc```
+
+#### setuptools installation from source
 ```python setup.py install```

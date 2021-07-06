@@ -42,6 +42,8 @@ import shutil
 import numpy as np
 import nibabel as nb
 import datetime as dt
+import pandas as pd
+from glob import glob
 
 import bids
 
@@ -51,10 +53,10 @@ from .graphics import (plot_roi_timeseries, plot_roi_powerspec,
                        orthoslices,
                        roi_demeaned_ts)
 from .rois import register_template, make_rois
-from .metrics import qc_metrics
+from .metrics import signal_metrics, moco_metrics
 from .moco import moco_phantom, moco_live
 from .report import ReportPDF
-from .summary import SummaryPDF
+from .summary import Summarize
 
 
 class CBICQC:
@@ -74,6 +76,8 @@ class CBICQC:
         # Batch subject/session ids
         self._this_subject = ''
         self._this_session = ''
+        self._this_epits_fpath = ''
+        self._this_epits_stub = ''
 
         # BIDS layout
         self._layout = None
@@ -101,99 +105,89 @@ class CBICQC:
         # Flags
         self._save_intermediates = False
 
+        # Metrics of interest to summarize
+        self._metrics_df = pd.DataFrame()
+        self._metrics_of_interest = []
+
+        # Future proofing. As of pybids version 0.14.0, 'extensio' entity will include the leading dot.
+        bids.config.set_option('extension_initial_dot', True)
+
     def run(self):
 
         print('')
-        print('Starting CBIC QC analysis')
+        print('Starting CBIC EPI Timeseries QC analysis')
         print('')
 
-        # Index BIDS directory
-        print('  Indexing BIDS layout')
+        # Get complete list of EPI time series for this subject
+        # Use _bold.nii.gz suffix to identify time series for now
+        # TODO: Broaden search for non-BOLD series
+        epits_list = self._get_epits_list()
 
-        bids.config.set_option('extension_initial_dot', True)
+        # Init list of session metrics for this subject
+        metric_list = []
 
-        # TODO: Create and use a BIDS indexer instead of an ignore list
-        bids_indexer = bids.BIDSLayoutIndexer(ignore=['code', 'sourcedata', 'work', 'derivatives', 'exclude'])
-        self._layout = bids.BIDSLayout(self._bids_dir,
-                                  absolute_paths=True,
-                                  indexer=bids_indexer)
+        # Loop over all EPI timeseries images
+        for epits_fpath in epits_list:
 
-        print('    Indexing complete')
-        print('')
+            self._this_epits_fpath = epits_fpath
 
-        # Get complete subject list
-        if self._subject:
-            subject_list = [self._subject]
-        else:
-            subject_list = self._layout.get_subjects()
+            # Parse image filename for BIDS keys
+            bids_dict = bids.layout.parse_file_entities(epits_fpath)
+            self._this_subject = bids_dict['subject']
+            self._this_session = bids_dict['session']
 
-        for self._this_subject in subject_list:
+            # Extract EPI timeseries stub from file path
+            epits_stub = os.path.basename(epits_fpath).replace('.nii.gz', '')
 
-            print('  Subject {}'.format(self._this_subject))
+            print('')
+            print('    EPI timeseries {}'.format(epits_stub))
 
-            if self._session:
-                session_list = [self._session]
+            # Report PDF and JSON filenames - used in both report and summarize modes
+            self._report_pdf = os.path.join(
+                self._report_dir,
+                '{}_qc.pdf'.format(epits_stub)
+            )
+            self._report_json = self._report_pdf.replace('.pdf', '.json')
+
+            if os.path.isfile(self._report_pdf) and os.path.isfile(self._report_json):
+
+                # QC analysis and reporting already run
+                print('      Report and metadata detected for this session')
+
             else:
-                session_list = self._layout.get_sessions(subject=self._this_subject)
 
-            # Init list of session metrics for this subject
-            metric_list = []
+                # QC analysis and report generation
+                self._analyze_and_report()
 
-            for self._this_session in session_list:
+            # Add metrics for this subject/session to cumulative list
+            metric_list.append(self._get_metrics())
 
-                print('')
-                print('    Session {}'.format(self._this_session))
+        # Convert metric list to dataframe and save to file
+        self._metrics_df = pd.DataFrame(metric_list)
 
-                # Report PDF and JSON filenames
-                self._report_pdf = os.path.join(self._report_dir,
-                                                '{}_{}_qc.pdf'.format(self._this_subject, self._this_session))
-                self._report_json = self._report_pdf.replace('.pdf', '.json')
+        # Generate summary report for phantom QC only
+        if 'phantom' in self._mode:
+            Summarize(self._report_dir, self._metrics_df, self._past_months)
 
-                if os.path.isfile(self._report_pdf) and os.path.isfile(self._report_json):
-
-                    print('      Report and metadata detected for this session')
-
-                else:
-
-                    # Run QC analysis and report generation for this subject/session
-                    self._analyze_and_report()
-
-                # Add metrics for this subject/session to list
-                metric_list.append(self._get_metrics())
-
-            # Generate summary report
-            SummaryPDF(self._report_dir, metric_list, self._past_months)
-
-            # Cleanup temporary QC directory
-            self.cleanup()
+        # Cleanup temporary QC directory
+        self.cleanup()
 
     def _analyze_and_report(self):
 
-        # Get first QC image for this subject/session
-        img_list = self._layout.get(return_type='file',
-                                    extension=['nii', 'nii.gz'],
-                                    subject=self._this_subject,
-                                    session=self._this_session,
-                                    suffix=self._suffix)
-        if not img_list:
-            print('    * No QC images found for subject {} session {} - exiting'.
-                  format(self._this_subject, self._this_session))
-            sys.exit(1)
+        img_fname = self._this_epits_fpath
+        json_fname = img_fname.replace('.nii.gz', '.json')
 
-        qc_img_fname = img_list[0]
-        qc_meta_fname = qc_img_fname.replace('.nii.gz', '.json')
-
-        # Load 4D QC phantom image
-        print('      Loading QC timeseries image')
-        qc_nii = nb.load(qc_img_fname)
+        # Load EPI timeseries image
+        print('      Loading EPI timeseries image')
+        epits_nii = nb.load(img_fname)
 
         # Load metadata if available
         print('      Loading QC metadata')
         try:
-            with open(qc_meta_fname, 'r') as fd:
+            with open(json_fname, 'r') as fd:
                 meta = json.load(fd)
         except IOError:
-            print('      * Could not open image metadata {}'.format(qc_meta_fname))
+            print('      * Could not open image metadata {}'.format(json_fname))
             print('      * Using default imaging parameters')
             meta = self.default_metadata()
 
@@ -210,21 +204,23 @@ class CBICQC:
         # Integrate additional meta data from Nifti header and filename
         meta['Subject'] = self._this_subject
         meta['Session'] = self._this_session
-        meta['VoxelSize'] = ' x '.join(str(x) for x in qc_nii.header.get('pixdim')[1:4])
-        meta['MatrixSize'] = ' x '.join(str(x) for x in qc_nii.shape)
+        meta['VoxelSize'] = ' x '.join(str(x) for x in epits_nii.header.get('pixdim')[1:4])
+        meta['MatrixSize'] = ' x '.join(str(x) for x in epits_nii.shape)
 
-        # Perform rigid body motion correction on QC series
+        # Perform rigid body motion correction on EPI timeseries
+
+        # Hardwired moco flag for debugging
+        skip_moco = False
+
         print('      Starting {} motion correction'.format(self._mode))
         t0 = dt.datetime.now()
-
-        qc_moco_nii, qc_moco_pars = self._moco(qc_nii, skip=True)
-
+        epits_moco_nii, epits_moco_pars = self._moco(epits_nii, skip=skip_moco)
         t1 = dt.datetime.now()
         print('      Completed motion correction in {} seconds'.format((t1 - t0).seconds))
 
         # Temporal mean and sd images
         print('      Calculating temporal mean image')
-        tmean_nii, tsd_nii, tsfnr_nii = temporal_mean_sd(qc_moco_nii)
+        tmean_nii, tsd_nii, tsfnr_nii = temporal_mean_sd(epits_moco_nii)
 
         # Register labels to temporal mean via template image
         print('      Register labels to temporal mean image')
@@ -236,16 +232,19 @@ class CBICQC:
 
         # Extract ROI time series
         print('      Extracting ROI time series')
-        s_mean_t = extract_timeseries(qc_moco_nii, rois_nii)
+        s_mean_t = extract_timeseries(epits_moco_nii, rois_nii)
 
         # Detrend time series
         print('      Detrending time series')
-        fit_results, s_detrend_t = detrend_timeseries(s_mean_t)
+        fit_results, s_detrend_t, s_fit_t = detrend_timeseries(s_mean_t)
 
-        # Calculate QC metrics
-        metrics = qc_metrics(fit_results, tsfnr_nii, rois_nii)
+        # Calculate signal metrics
+        metrics = signal_metrics(fit_results, tsfnr_nii, rois_nii)
 
-        # Merge meta data into metrics dictionary for report JSON sidecar
+        # Add motion metrics to metrics dictionary
+        metrics.update(moco_metrics(epits_moco_pars))
+
+        # Add image meta data into metrics dictionary
         metrics.update(meta)
 
         # Time vector (seconds)
@@ -254,14 +253,14 @@ class CBICQC:
         print('      Generating Report')
 
         # Create report images
-        plot_roi_timeseries(t, s_mean_t, s_detrend_t, self._roi_ts_png)
+        plot_roi_timeseries(t, s_mean_t, s_detrend_t, s_fit_t, self._roi_ts_png)
         plot_roi_powerspec(t, s_detrend_t, self._roi_ps_png)
-        plot_mopar_timeseries(t, qc_moco_pars, self._mopar_ts_png)
-        plot_mopar_powerspec(t, qc_moco_pars, self._mopar_pspec_png)
-        roi_demeaned_ts(qc_moco_nii, rois_nii, self._rois_demeaned_png)
+        plot_mopar_timeseries(t, epits_moco_pars, self._mopar_ts_png)
+        plot_mopar_powerspec(t, epits_moco_pars, self._mopar_pspec_png)
+        roi_demeaned_ts(epits_moco_nii, rois_nii, self._rois_demeaned_png)
         orthoslices(tmean_nii, self._tmean_montage_png, cmap='gray', irng='robust')
         orthoslices(tsd_nii, self._tsd_montage_png, cmap='viridis', irng='robust')
-        orthoslices(rois_nii, self._rois_montage_png, cmap='tab20', irng='noscale')
+        orthoslices(rois_nii, self._rois_montage_png, cmap='Pastel1', irng='noscale')
 
         # OPTIONAL: Save intermediate images
         if self._save_intermediates:
@@ -336,6 +335,16 @@ class CBICQC:
             metrics = json.load(fd)
 
         return metrics
+
+    def _get_subject_list(self):
+
+        tmp_list = glob(os.path.join(self._bids_dir, 'sub-*'))
+        return [os.path.basename(d).replace('sub-', '') for d in tmp_list]
+
+    def _get_epits_list(self):
+
+        return glob(os.path.join(self._bids_dir, 'sub-*', 'ses-*', 'func', '*_bold.nii.gz'))
+
 
     @staticmethod
     def default_metadata():
