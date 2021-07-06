@@ -2,16 +2,13 @@
 
 Essential quality control analysis of routine phantom stability MRI with single session and trend reporting
 
-## Current Version ##
-2021.7.6
+### Latest Version : 2021.7.6
 
-## External Dependencies
-FSL 6.0 or later
+### External Dependencies
+FSL 6.0 or later (https://fsl.fmrib.ox.ac.uk/fsl/fslwiki/FslInstallation)
 
-## Installation
-
-#### PyPi installation
+### PyPi installation
 ```pip3 install cbicqc```
 
-#### setuptools installation from source
+### setuptools installation from source
 ```python setup.py install```
