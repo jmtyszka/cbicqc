@@ -99,10 +99,15 @@ def moco_live(img_nii, work_dir):
     nb.save(img_nii, in_fname)
 
     mcflirt_cmd = os.path.join(os.environ['FSLDIR'], 'bin', 'mcflirt')
-    subprocess.run([mcflirt_cmd,
-                    '-in', in_fname,
-                    '-out', out_stub,
-                    '-plots'])
+
+    # Check that MCFLIRT binary exists
+    if os.path.isfile(mcflirt_cmd):
+        subprocess.run([mcflirt_cmd,
+                        '-in', in_fname,
+                        '-out', out_stub,
+                        '-plots'])
+    else:
+        print('* MCFLIRT not available - please install FSL and update your environment')
 
     # Load motion corrected QC timeseries
     moco_nii = nb.load(out_stub + '.nii.gz')

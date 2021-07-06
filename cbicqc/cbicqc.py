@@ -59,14 +59,14 @@ from .summary import SummaryPDF
 
 class CBICQC:
 
-    def __init__(self, bids_dir, subject='', session='', mode='phantom', summary=0):
+    def __init__(self, bids_dir, subject='', session='', mode='phantom', past_months=12):
 
         # Copy arguments into object
         self._bids_dir = bids_dir
         self._subject = subject
         self._session = session
         self._mode = mode
-        self._summary = summary
+        self._past_months = past_months
 
         # Phantom or in vivo suffix ('T2star' or 'bold')
         self._suffix = 'T2star' if 'phantom' in mode else 'bold'
@@ -111,9 +111,12 @@ class CBICQC:
         print('  Indexing BIDS layout')
 
         bids.config.set_option('extension_initial_dot', True)
+
+        # TODO: Create and use a BIDS indexer instead of an ignore list
+        bids_indexer = bids.BIDSLayoutIndexer(ignore=['code', 'sourcedata', 'work', 'derivatives', 'exclude'])
         self._layout = bids.BIDSLayout(self._bids_dir,
                                   absolute_paths=True,
-                                  ignore=['sourcedata', 'work', 'derivatives', 'exclude'])
+                                  indexer=bids_indexer)
 
         print('    Indexing complete')
         print('')
@@ -141,36 +144,28 @@ class CBICQC:
                 print('')
                 print('    Session {}'.format(self._this_session))
 
-                # Report PDF and JSON filenames - used in both report and summarize modes
+                # Report PDF and JSON filenames
                 self._report_pdf = os.path.join(self._report_dir,
                                                 '{}_{}_qc.pdf'.format(self._this_subject, self._this_session))
                 self._report_json = self._report_pdf.replace('.pdf', '.json')
 
-                if self._summary > 0:
+                if os.path.isfile(self._report_pdf) and os.path.isfile(self._report_json):
 
-                    # Load metrics for this subject/session
-                    metric_list.append(self._get_metrics())
+                    print('      Report and metadata detected for this session')
 
                 else:
 
-                    if os.path.isfile(self._report_pdf) and os.path.isfile(self._report_json):
+                    # Run QC analysis and report generation for this subject/session
+                    self._analyze_and_report()
 
-                        print('      Report and metadata detected for this session - skipping')
+                # Add metrics for this subject/session to list
+                metric_list.append(self._get_metrics())
 
-                    else:
+            # Generate summary report
+            SummaryPDF(self._report_dir, metric_list, self._past_months)
 
-                        # QC analysis and report generation
-                        self._analyze_and_report()
-
-            if self._summary > 0:
-
-                # Generate summary report
-                SummaryPDF(self._report_dir, metric_list, self._summary)
-
-            else:
-
-                # Cleanup temporary QC directory
-                self.cleanup()
+            # Cleanup temporary QC directory
+            self.cleanup()
 
     def _analyze_and_report(self):
 

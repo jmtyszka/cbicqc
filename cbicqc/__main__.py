@@ -33,7 +33,6 @@ import os
 import sys
 import argparse
 import pkg_resources
-import subprocess
 
 from cbicqc.cbicqc import CBICQC
 
@@ -44,7 +43,7 @@ def main():
 	parser = argparse.ArgumentParser(description='Lightweight daily phantom QC analysis and reporting')
 	parser.add_argument('-d', '--dir', default='.', help='BIDS QC dataset directory')
 	parser.add_argument('-m', '--mode', default='phantom', help="QC Mode (phantom or live)")
-	parser.add_argument('-s', '--summary', default=0, help='Generate QC summary for past N months [0 no summary]')
+	parser.add_argument('-p', '--past', default=12, help='Number of past months to summarize [12]')
 	parser.add_argument('--sub', default='', help='Subject ID')
 	parser.add_argument('--ses', default='', help='Session ID')
 	
@@ -54,7 +53,7 @@ def main():
 	subj_id = args.sub
 	sess_id = args.ses
 	mode = args.mode
-	summary = args.summary
+	past_months = args.past
 	
 	# Read version from setup.py
 	ver = pkg_resources.get_distribution('cbicqc').version
@@ -67,16 +66,12 @@ def main():
 	print('Version : {}'.format(ver))
 	print('')
 	print('BIDS Directory : {}'.format(bids_dir))
-	
-	print('Subject : {}'.format(subj_id if len(subj_id) > 0 else 'All Subjects'))
-	
-	if summary > 0:
-		print('Summarizing last {:d} months'.format(summary))
-	else:
-		print('Session : {}'.format(sess_id if len(sess_id) > 0 else 'All Sessions'))
+	print('Subject     : {:s}'.format(subj_id if len(subj_id) > 0 else 'All Subjects'))
+	print('Session     : {:s}'.format(sess_id if len(sess_id) > 0 else 'All Sessions'))
+	print('Past months : {:d}'.format(past_months))
 	
 	# Setup QC analysis
-	qc = CBICQC(bids_dir=bids_dir, subject=subj_id, session=sess_id, mode=mode, summary=summary)
+	qc = CBICQC(bids_dir=bids_dir, subject=subj_id, session=sess_id, mode=mode, past_months=past_months)
 	
 	# Run analysis
 	qc.run()
