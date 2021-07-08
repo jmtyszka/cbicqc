@@ -79,8 +79,6 @@ def detrend_timeseries(s_mean_t):
     :return:
     """
 
-    np.savetxt("/Users/jmt/sandbox/s_mean_t.csv", s_mean_t, delimiter=",")
-
     # Mean label ROI signal (n_labels x n_timepoints)
     nl, nt = s_mean_t.shape
 
