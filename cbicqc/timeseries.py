@@ -76,7 +76,7 @@ def extract_timeseries(qc_moco_nii, rois_nii):
 def detrend_timeseries(s_mean_t):
     """
     :param s_mean_t: spatial mean ROI timeseries
-    :return:
+    :return: fit_results, s_detrend_t, s_fit_t
     """
 
     # Mean label ROI signal (n_labels x n_timepoints)
