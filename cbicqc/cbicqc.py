@@ -90,9 +90,11 @@ class CBICQC:
         # Intermediate filenames
         self._report_pdf = ''
         self._report_json = ''
-        self._tmean_fname = os.path.join(self._work_dir, 'tmean.nii.gz')
-        self._tsd_fname = os.path.join(self._work_dir, 'tsd.nii.gz')
-        self._roi_labels_fname = os.path.join(self._work_dir, 'roi_labels.nii.gz')
+        self._tmean_fname = os.path.join(self._report_dir, 'tmean.nii.gz')
+        self._tsd_fname = os.path.join(self._report_dir, 'tsd.nii.gz')
+        self._tsfnr_fname = os.path.join(self._report_dir, 'tsfnr.nii.gz')
+        self._roi_labels_fname = os.path.join(self._report_dir, 'roi_labels.nii.gz')
+
         self._roi_ts_png = os.path.join(self._work_dir, 'roi_timeseries.png')
         self._roi_ps_png = os.path.join(self._work_dir, 'roi_powerspec.png')
         self._mopar_ts_png = os.path.join(self._work_dir, 'mopar_timeseries.png')
@@ -103,7 +105,7 @@ class CBICQC:
         self._rois_demeaned_png = os.path.join(self._work_dir, 'rois_demeaned.png')
 
         # Flags
-        self._save_intermediates = False
+        self._save_intermediates = True
 
         # Metrics of interest to summarize
         self._metrics_df = pd.DataFrame()
@@ -278,6 +280,7 @@ class CBICQC:
             nb.save(tmean_nii, self._tmean_fname)
             nb.save(tsd_nii, self._tsd_fname)
             nb.save(rois_nii, self._roi_labels_fname)
+            nb.save(tsfnr_nii, self._tsfnr_fname)
 
         # Construct filename dictionary to pass to PDF generator
         fnames = dict(WorkDir=self._work_dir,
@@ -354,7 +357,7 @@ class CBICQC:
 
     def _get_epits_list(self):
 
-        return glob(os.path.join(self._bids_dir, 'sub-*', 'ses-*', 'func', '*_bold.nii.gz'))
+        return glob(os.path.join(self._bids_dir, 'sub-*', 'ses-*', 'func', '*part-mag*_bold.nii.gz'))
 
 
     @staticmethod
