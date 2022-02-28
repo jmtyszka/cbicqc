@@ -33,9 +33,8 @@ import os
 import sys
 import argparse
 import pkg_resources
-import subprocess
 
-from .cbicqc import CBICQC
+from cbicqc import CBICQC
 
 
 def main():
@@ -46,15 +45,17 @@ def main():
     parser.add_argument('-p', '--past', default=12, type=int, help='Number of past months to summarize [12]')
     parser.add_argument('--sub', default='', help='Subject ID')
     parser.add_argument('--ses', default='', help='Session ID')
-    parser.add_argument('--no-sessions', action='')
+    parser.add_argument('--no-sessions', action='store_true', default=False, help='Do not use session sub-directories')
 
     # Parse command line arguments
     args = parser.parse_args()
+
     bids_dir = os.path.realpath(args.dir)
-    subj_id = args.sub
-    sess_id = args.ses
     mode = args.mode
     past_months = args.past
+    subj_id = args.sub
+    sess_id = args.ses
+    no_sessions = args.no_sessions
 
     # Read version from setup.py
     ver = pkg_resources.get_distribution('cbicqc').version
@@ -68,14 +69,17 @@ def main():
     print('')
     print('BIDS Directory : {}'.format(bids_dir))
     print('Subject : {}'.format(subj_id if len(subj_id) > 0 else 'All Subjects'))
-    print('Session : {}'.format(sess_id if len(sess_id) > 0 else 'All Sessions'))
+    if no_sessions:
+        print('Session : No Sessions')
+    else:
+        print('Session : {}'.format(sess_id if len(sess_id) > 0 else 'All Sessions'))
 
     # Long term summary relevent for phantom QC
     if 'phantom' in mode:
         print('Summary : {} months'.format(past_months))
 
     # Setup QC analysis
-    qc = CBICQC(bids_dir=bids_dir, subject=subj_id, session=sess_id, mode=mode, past_months=past_months)
+    qc = CBICQC(bids_dir=bids_dir, subject=subj_id, session=sess_id, mode=mode, past_months=past_months, no_sessions=no_sessions)
 
     # Run analysis
     qc.run()

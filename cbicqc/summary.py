@@ -53,7 +53,7 @@ from reportlab.platypus import (SimpleDocTemplate,
                                 Table,
                                 PageBreak)
 
-from .graphics import (metric_trend_plot)
+from graphics import (metric_trend_plot)
 
 
 class Summarize:

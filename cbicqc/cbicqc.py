@@ -47,21 +47,21 @@ from glob import glob
 
 import bids
 
-from .timeseries import temporal_mean_sd, extract_timeseries, detrend_timeseries
-from .graphics import (plot_roi_timeseries, plot_roi_powerspec,
+from timeseries import temporal_mean_sd, extract_timeseries, detrend_timeseries
+from graphics import (plot_roi_timeseries, plot_roi_powerspec,
                        plot_mopar_timeseries, plot_mopar_powerspec,
                        orthoslices,
                        roi_demeaned_ts)
-from .rois import register_template, make_rois
-from .metrics import signal_metrics, moco_metrics
-from .moco import moco_phantom, moco_live
-from .report import ReportPDF
-from .summary import Summarize
+from rois import register_template, make_rois
+from metrics import signal_metrics, moco_metrics
+from moco import moco_phantom, moco_live
+from report import ReportPDF
+from summary import Summarize
 
 
 class CBICQC:
 
-    def __init__(self, bids_dir, subject='', session='', mode='phantom', past_months=12):
+    def __init__(self, bids_dir, subject='', session='', mode='phantom', past_months=12, no_sessions=False):
 
         # Copy arguments into object
         self._bids_dir = bids_dir
@@ -69,6 +69,7 @@ class CBICQC:
         self._session = session
         self._mode = mode
         self._past_months = past_months
+        self._no_sessions = no_sessions
 
         # Phantom or in vivo suffix ('T2star' or 'bold')
         self._suffix = 'T2star' if 'phantom' in mode else 'bold'
@@ -125,6 +126,9 @@ class CBICQC:
         # TODO: Broaden search for non-BOLD series
         epits_list = self._get_epits_list()
 
+        if len(epits_list) < 1:
+            print(f'*** No EPI timeseries found in {self._bids_dir}')
+
         # Init list of session metrics for this subject
         metric_list = []
 
@@ -136,7 +140,10 @@ class CBICQC:
             # Parse image filename for BIDS keys
             bids_dict = bids.layout.parse_file_entities(epits_fpath)
             self._this_subject = bids_dict['subject']
-            self._this_session = bids_dict['session']
+            if 'session' in bids_dict:
+                self._this_session = bids_dict['session']
+            else:
+                self._this_session = 'None'
 
             # Extract EPI timeseries stub from file path
             epits_stub = os.path.basename(epits_fpath).replace('.nii.gz', '')
@@ -357,8 +364,21 @@ class CBICQC:
 
     def _get_epits_list(self):
 
-        return glob(os.path.join(self._bids_dir, 'sub-*', 'ses-*', 'func', '*part-mag*_bold.nii.gz'))
+        # Check for presence of BOLD phase images. If they're present, add part-mag tag
+        # to avoid running CBICQC on phase images (which won't work)
+        phase_list = glob(os.path.join(self._bids_dir, 'sub-*', 'func', '*part-phase*_bold.nii.gz'))
+        if len(phase_list) > 0:
+            print('* EPI phase images detected - selecting magnitude images only')
+            part_tag = 'part-mag'
+        else:
+            part_tag = ''
 
+        if self._no_sessions:
+            epits_list = glob(os.path.join(self._bids_dir, 'sub-*', 'func', f'*{part_tag}*_bold.nii.gz'))
+        else:
+            epits_list = glob(os.path.join(self._bids_dir, 'sub-*', 'ses-*', 'func', f'*{part_tag}*_bold.nii.gz'))
+
+        return epits_list
 
     @staticmethod
     def default_metadata():

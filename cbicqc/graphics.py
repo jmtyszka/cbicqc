@@ -33,7 +33,7 @@ from skimage.exposure import rescale_intensity
 import pandas as pd
 from datetime import date
 
-from .moco import total_rotation
+from moco import total_rotation
 
 
 def plot_roi_timeseries(t, s_mean_t, s_fit_t, s_detrend_t, plot_fname):
