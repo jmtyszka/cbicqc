@@ -46,6 +46,7 @@ def main():
     parser.add_argument('-p', '--past', default=12, type=int, help='Number of past months to summarize [12]')
     parser.add_argument('--sub', default='', help='Subject ID')
     parser.add_argument('--ses', default='', help='Session ID')
+    parser.add_argument('--no-sessions', action='')
 
     # Parse command line arguments
     args = parser.parse_args()

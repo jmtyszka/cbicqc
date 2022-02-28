@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 CBICQC quality control analysis and reporting class
 The main analysis and reporting workflow is handled from here

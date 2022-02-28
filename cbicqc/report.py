@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Create HTML report from QC analysis results
 

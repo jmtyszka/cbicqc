@@ -1,4 +1,3 @@
-# !/usr/bin/env python
 """
 QC analysis node for nipype
 

@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 #
 # WORK IN PROGRESS - DO NOT USE!!
 #

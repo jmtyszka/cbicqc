@@ -1,4 +1,3 @@
-# !/usr/bin/env python
 """
 Graph plotting and image figure functions
 
