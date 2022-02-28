@@ -34,7 +34,7 @@ import sys
 import argparse
 import pkg_resources
 
-from cbicqc import CBICQC
+from .cbicqc import CBICQC
 
 
 def main():

@@ -47,16 +47,16 @@ from glob import glob
 
 import bids
 
-from timeseries import temporal_mean_sd, extract_timeseries, detrend_timeseries
-from graphics import (plot_roi_timeseries, plot_roi_powerspec,
+from .timeseries import temporal_mean_sd, extract_timeseries, detrend_timeseries
+from .graphics import (plot_roi_timeseries, plot_roi_powerspec,
                        plot_mopar_timeseries, plot_mopar_powerspec,
                        orthoslices,
                        roi_demeaned_ts)
-from rois import register_template, make_rois
-from metrics import signal_metrics, moco_metrics
-from moco import moco_phantom, moco_live
-from report import ReportPDF
-from summary import Summarize
+from .rois import register_template, make_rois
+from .metrics import signal_metrics, moco_metrics
+from .moco import moco_phantom, moco_live
+from .report import ReportPDF
+from .summary import Summarize
 
 
 class CBICQC:
