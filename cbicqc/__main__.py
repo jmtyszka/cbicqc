@@ -35,7 +35,7 @@ import argparse
 import pkg_resources
 import subprocess
 
-from cbicqc.cbicqc import CBICQC
+from .cbicqc import CBICQC
 
 
 def main():

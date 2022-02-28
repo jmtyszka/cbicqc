@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 CBICQC timeseries analysis node
 

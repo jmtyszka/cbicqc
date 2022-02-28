@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Quality control metric calculations from ROI timeseries fit results
 
