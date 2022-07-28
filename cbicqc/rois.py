@@ -68,7 +68,7 @@ def register_template(tmean_nii, work_dir, mode='phantom'):
         dof = 6
         template_fname = pkg_resources.resource_filename(
             __name__,
-            os.path.join('templates', 'fbirn_sphere.nii.gz')
+            os.path.join('templates', 'fbirn_template.nii.gz')
         )
         labels_fname = pkg_resources.resource_filename(
             __name__,

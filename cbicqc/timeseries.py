@@ -36,7 +36,7 @@ def temporal_mean_sd(qc_moco_nii):
     # Temporal mean of 4D timeseries
     tmean = np.mean(qc, axis=3)
     tsd = np.std(qc, axis=3)
-    tsfnr = tmean / (tsd + np.finfo(float).eps)
+    tsfnr = tmean / (tsd + 1e-30)
 
     tmean_nii = nb.Nifti1Image(tmean, qc_moco_nii.affine)
     tsd_nii = nb.Nifti1Image(tsd, qc_moco_nii.affine)
@@ -101,7 +101,7 @@ def detrend_timeseries(s_mean_t):
         # [Exp Amp, Exp Tau, Linear slope, Offset]
         x0 = [s_rng, 1, -s_rng / float(nt), s_mean]
         bounds = ([0.0, 0, -np.inf, 0],
-                  [s_rng, nt, np.inf, np.inf])
+                  [2.0 * s_rng, nt, np.inf, np.inf])
 
         # Robust non-linear curve fit (Huber loss function)
         result = least_squares(explin, x0,

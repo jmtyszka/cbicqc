@@ -112,9 +112,6 @@ class CBICQC:
         self._metrics_df = pd.DataFrame()
         self._metrics_of_interest = []
 
-        # Future proofing. As of pybids version 0.14.0, 'extensio' entity will include the leading dot.
-        bids.config.set_option('extension_initial_dot', True)
-
     def run(self):
 
         print('')
@@ -366,17 +363,18 @@ class CBICQC:
 
         # Check for presence of BOLD phase images. If they're present, add part-mag tag
         # to avoid running CBICQC on phase images (which won't work)
-        phase_list = glob(os.path.join(self._bids_dir, 'sub-*', 'func', '*part-phase*_bold.nii.gz'))
+        phase_list = glob(os.path.join(self._bids_dir, 'sub-*', 'ses-*', 'func', '*part-phase*_bold.nii*'))
         if len(phase_list) > 0:
             print('* EPI phase images detected - selecting magnitude images only')
-            part_tag = 'part-mag'
+            part_tag = 'part-mag*'
         else:
+            print('No EPI phase images detected - assuming magnitude images only')
             part_tag = ''
 
         if self._no_sessions:
             epits_list = glob(os.path.join(self._bids_dir, 'sub-*', 'func', f'*{part_tag}*_bold.nii.gz'))
         else:
-            epits_list = glob(os.path.join(self._bids_dir, 'sub-*', 'ses-*', 'func', f'*{part_tag}*_bold.nii.gz'))
+            epits_list = glob(os.path.join(self._bids_dir, 'sub-*', 'ses-*', 'func', f'*{part_tag}_bold.nii.gz'))
 
         return epits_list
 

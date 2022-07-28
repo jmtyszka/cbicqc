@@ -8,7 +8,7 @@ Mike Tyszka, Caltech Brain Imaging Center
 
 MIT License
 
-Copyright (c) 2019 Mike Tyszka
+Copyright (c) 2022 Mike Tyszka
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -38,6 +38,7 @@ from .cbicqc import CBICQC
 
 
 def main():
+
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Lightweight daily phantom QC analysis and reporting')
     parser.add_argument('-d', '--dir', default='.', help='BIDS QC dataset directory')
