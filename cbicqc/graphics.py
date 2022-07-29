@@ -58,6 +58,7 @@ def plot_roi_timeseries(t, s_mean_t, s_fit_t, s_detrend_t, plot_fname):
         axs[lc].plot(t, s_detrend_t[lc, :], label='Model')
         axs[lc].plot(t, s_fit_t[lc, :], label='Detrended')
         axs[lc].set_title(roi_names[lc], loc='left')
+        axs[lc].grid(color='gray', linestyle=':', linewidth=1)
 
     # Add x label to final subplot
     axs[2].set_xlabel('Time (s)')
@@ -97,7 +98,7 @@ def plot_roi_powerspec(t, s_detrend_t, plot_fname):
     pspec = pspec[:, 1:]
     f = f[1:]
 
-    plt.subplots(3, 1, figsize=(10, 5))
+    fig, axs = plt.subplots(3, 1, figsize=(10, 5))
 
     for lc in range(0, 3):
 
@@ -109,12 +110,12 @@ def plot_roi_powerspec(t, s_detrend_t, plot_fname):
         else:
             p_db = 10.0 * np.log10(p / np.max(p))
 
-        plt.subplot(3, 1, lc + 1)
-        plt.plot(f, p_db)
-        plt.title(titles[lc], loc='left')
+        axs[lc].plot(f, p_db)
+        axs[lc].set_title(titles[lc], loc='left')
+        axs[lc].grid(color='gray', linestyle=':', linewidth=1)
 
     # Add x label to final subplot
-    plt.xlabel('Frequency (Hz)')
+    axs[2].set_xlabel('Frequency (Hz)')
 
     # Space subplots without title overlap
     plt.tight_layout()
@@ -146,6 +147,7 @@ def plot_mopar_timeseries(moco_df, plot_fname):
         kind='line',
         ax=axs[0]
     )
+    axs[0].grid(color='gray', linestyle=':', linewidth=1)
 
     # Plot axis rotations in radians
     moco_df.plot(
@@ -154,6 +156,7 @@ def plot_mopar_timeseries(moco_df, plot_fname):
         kind='line',
         ax=axs[1]
     )
+    axs[1].grid(color='gray', linestyle=':', linewidth=1)
 
     # Space subplots without title overlap
     plt.tight_layout()
@@ -216,6 +219,7 @@ def plot_mopar_powerspec(moco_df, plot_fname):
 
         axs[lc].plot(f, p_db)
         axs[lc].set_title(titles[lc], loc='left')
+        axs[lc].grid(color='gray', linestyle=':', linewidth=1)
 
     # Add x axis label to last subplot
     axs[1].set_xlabel('Frequency (Hz)')

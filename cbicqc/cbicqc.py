@@ -47,6 +47,7 @@ from glob import glob
 from pathlib import Path
 
 import bids
+bids.config.set_option('extension_initial_dot', True)
 
 from .timeseries import temporal_mean_sd, extract_timeseries, detrend_timeseries
 from .graphics import (plot_roi_timeseries, plot_roi_powerspec,
