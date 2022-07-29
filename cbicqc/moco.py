@@ -28,9 +28,12 @@ import os
 import subprocess
 import numpy as np
 import nibabel as nb
+import pandas as pd
+
 from scipy.ndimage.measurements import center_of_mass
 from scipy.ndimage import shift
 from scipy.spatial.transform import Rotation
+from scipy import signal
 
 
 def moco_phantom(img_nii):
@@ -94,24 +97,38 @@ def moco_live(img_nii, work_dir):
 
     in_fname = os.path.join(work_dir, 'qc.nii.gz')
     out_stub = os.path.join(work_dir, 'qc_mcf')
+    out_image = out_stub + '.nii.gz'
+    out_pars = out_stub + '.par'
 
     # Save QC timeseries for MCFLIRT
-    nb.save(img_nii, in_fname)
-
-    mcflirt_cmd = os.path.join(os.environ['FSLDIR'], 'bin', 'mcflirt')
-
-    # Check that MCFLIRT binary exists
-    if os.path.isfile(mcflirt_cmd):
-        subprocess.run([mcflirt_cmd,
-                        '-in', in_fname,
-                        '-out', out_stub,
-                        '-plots'])
+    if os.path.isfile(in_fname):
+        print('      * Raw QC series already exists in work directory - skipping')
     else:
-        print('* MCFLIRT not available - please install FSL and update your environment')
+        nb.save(img_nii, in_fname)
+
+    # Check for existing moco series in work directory
+    if not os.path.isfile(out_image):
+
+        mcflirt_cmd = os.path.join(os.environ['FSLDIR'], 'bin', 'mcflirt')
+
+        # Check that MCFLIRT binary exists
+        if os.path.isfile(mcflirt_cmd):
+            subprocess.run([mcflirt_cmd,
+                            '-in', in_fname,
+                            '-out', out_stub,
+                            '-plots'])
+        else:
+            print('      * MCFLIRT not available - please install FSL and update your environment')
+
+    else:
+
+        print('      * Motion corrected QC series already exists in work directory - skipping')
 
     # Load motion corrected QC timeseries
-    moco_nii = nb.load(out_stub + '.nii.gz')
-    moco_pars = np.genfromtxt(out_stub + '.par')
+    moco_nii = nb.load(out_image)
+
+    # Import motion parameter table as a pandas dataframe
+    moco_pars = np.genfromtxt(out_pars)
 
     return moco_nii, moco_pars
 
@@ -149,6 +166,116 @@ def total_rotation(rot):
         phi_tot[tc] = np.linalg.norm(Rtot.as_rotvec()) * 180.0 / np.pi
 
     return phi_tot
+
+
+def moco_postprocess(moco_pars, meta):
+
+    # Dataframe column names
+    column_names = [
+        "Time_s",
+        "Rx_rad",
+        "Ry_rad",
+        "Rz_rad",
+        "Dx_mm",
+        "Dy_mm",
+        "Dz_mm",
+        "FD_mm",
+        "FD_LPF_mm"
+    ]
+
+    # Time vector (seconds)
+    TR_s = meta['RepetitionTime']
+    nt = moco_pars.shape[0]
+    t = np.arange(0, nt).reshape(-1, 1) * TR_s
+
+    # Calculate FD variants
+    fd, fd_lpf = calc_fd(moco_pars, TR_s)
+
+    # Create and fill numpy array
+    moco_arr = np.hstack((t, moco_pars, fd, fd_lpf))
+
+    # Construct dataframe
+    moco_df = pd.DataFrame(moco_arr, columns=column_names)
+
+    return moco_df
+
+
+def calc_fd(mocopars, TR_s):
+    """
+    Calculate Power FD and LPF FD from 6-column mocopar array (FSL MCFLIRT format)
+    NOTE: Linear LPF performed on final FD rather than individual motion parameters since rotation non-linear
+    for larger angles
+
+    Column order: Rx_rad, Ry_rad, Rz_rad, Tx_mm, Ty_mm, Tz_mm
+
+    References:
+    J. D. Power, K. A. Barnes, A. Z. Snyder, B. L. Schlaggar, and S. E. Petersen,
+    “Spurious but systematic correlations in functional connectivity MRI networks arise from subject motion,”
+    Neuroimage, vol. 59, pp. 2142–2154, Feb. 2012, doi: 10.1016/j.neuroimage.2011.10.018. [Online].
+    Available: http://dx.doi.org/10.1016/j.neuroimage.2011.10.018
+
+    Gratton, C., Dworetsky, A., Coalson, R. S., Adeyemo, B., Laumann, T. O., Wig, G. S., Kong, T. S., Gratton, G.,
+    Fabiani, M., Barch, D. M., Tranel, D., Dominguez, O. M.-, Fair, D. A., Dosenbach, N. U. F., Snyder, A. Z.,
+    Perlmutter, J. S., Petersen, S. E. & Campbell, M. C.
+    Removal of high frequency contamination from motion estimates in single-band fMRI saves data without biasing
+    functional connectivity. Neuroimage 116866 (2020). doi:10.1016/j.neuroimage.2020.116866
+    """
+
+    # Rotations (radians)
+    rx = mocopars[:, 0]
+    ry = mocopars[:, 1]
+    rz = mocopars[:, 2]
+
+    # Translations (mm)
+    tx = mocopars[:, 3]
+    ty = mocopars[:, 4]
+    tz = mocopars[:, 5]
+
+    # Backward differences (forward difference + leading 0)
+
+    drx = np.insert(np.diff(rx), 0, 0)
+    dry = np.insert(np.diff(ry), 0, 0)
+    drz = np.insert(np.diff(rz), 0, 0)
+
+    dtx = np.insert(np.diff(tx), 0, 0)
+    dty = np.insert(np.diff(ty), 0, 0)
+    dtz = np.insert(np.diff(tz), 0, 0)
+
+    # Total framewise displacement (Power 2012)
+    r_sphere = 50.0  # mm
+    fd = np.abs(dtx) + np.abs(dty) + np.abs(dtz) + r_sphere * (np.abs(drx) + np.abs(dry) + np.abs(drz))
+
+    # Create 0.2 Hz Butterworth LPF for this TR
+    b, a = butterworth_lpf(TR_s)
+
+    # Apply forward-backward LPF to FD timeseries
+    fd_lpf = signal.filtfilt(b, a, fd, axis=0)
+
+    # Return single-column 2D arrays for hstacking
+    return fd.reshape(-1, 1), fd_lpf.reshape(-1, 1)
+
+
+def butterworth_lpf(TR=1.0):
+    """
+    Construct a 0.2 Hz low-pass Butterworth filter
+
+    param: TR, float
+        EPI TR in seconds [1.0 s]
+    """
+
+    # Sampling rate (Hz)
+    fs = 1.0 / TR
+
+    # Butterworth order
+    N = 5
+
+    # Critical frequency (Hz - same units as fs)
+    fc = 0.2
+
+    # Design filter
+    b, a = signal.butter(N, fc, 'low', analog=False, output='ba', fs=fs)
+
+    return b, a
 
 
 

@@ -126,36 +126,34 @@ def plot_roi_powerspec(t, s_detrend_t, plot_fname):
     plt.close()
 
 
-def plot_mopar_timeseries(t, mopars, plot_fname):
+def plot_mopar_timeseries(moco_df, plot_fname):
     """
     Plots x, y, z displacement and rotation timeseries from MCFLIRT registrations
 
-    mopars columns: (dx, dy, dz, rx, ry, rz)
-    Displacements in mm, rotations in degrees
-
-    :param t: float array, nt x 1 time vector
-    :param mopars: float array, nt x 6 motion parameters [rx, ry, rz, dx, dy, dz]
-    :param plot_fname: str, output plot filename
+    :param moco_df: dataframe
+        Motion correction parameters
+    :param plot_fname: str
+        Output plot filename
     :return:
     """
 
-    nt = mopars.shape[0]
-    t = np.arange(0, nt)
+    fig, axs = plt.subplots(2, 1, figsize=(10, 5))
 
-    plt.subplots(2, 1, figsize=(10, 5))
+    # Plot axis displacements in mm
+    moco_df.plot(
+        x='Time_s',
+        y=['Dx_mm', 'Dy_mm', 'Dz_mm'],
+        kind='line',
+        ax=axs[0]
+    )
 
-    plt.subplot(2, 1, 1)
-    plt.plot(t, mopars[:, 3:6] * 1e3)
-    plt.legend(['x', 'y', 'z'])
-    plt.title('Displacement (um)', loc='left')
-
-    plt.subplot(2, 1, 2)
-    plt.plot(t, mopars[:, 0:3] * 1e3)
-    plt.legend(['x', 'y', 'z'])
-    plt.title('Rotation (mdeg)', loc='left')
-
-    # Add x label to final subplot
-    plt.xlabel('Time (s)')
+    # Plot axis rotations in radians
+    moco_df.plot(
+        x='Time_s',
+        y=['Rx_rad', 'Ry_rad', 'Rz_rad'],
+        kind='line',
+        ax=axs[1]
+    )
 
     # Space subplots without title overlap
     plt.tight_layout()
@@ -167,24 +165,31 @@ def plot_mopar_timeseries(t, mopars, plot_fname):
     plt.close()
 
 
-def plot_mopar_powerspec(t, mopars, plot_fname):
+def plot_mopar_powerspec(moco_df, plot_fname):
     """
     Plot total motion power spectrum
 
-    :param t: float array, time vector (s)
-    :param mopars: array, N x 6
+    :param moco_df: dataframe
+
     :param plot_fname:
     :return:
     """
 
+    # Extract vectors from dataframe
+    t = moco_df['Time_s'].values
+
+    # Extract moco par values as numpy arrays
+    Dxyz = moco_df[['Dx_mm', 'Dy_mm', 'Dz_mm']].values
+    Rxyz = moco_df[['Rx_rad', 'Ry_rad', 'Rz_rad']].values
+
     # Sampling frequency (Hz)
     fs = 1.0 / (t[1] - t[0])
 
-    # Total displacement timecourse
-    dtot = np.linalg.norm(mopars[:, 3:6], ord=2, axis=1)
+    # Total displacement timecourse (mm)
+    dtot = np.linalg.norm(Dxyz, ord=2, axis=1)
 
-    # Total rotation timecourse
-    rtot = total_rotation(mopars[:, 0:3])
+    # Total rotation timecourse (degrees)
+    rtot = total_rotation(Rxyz)
 
     # Total motion array
     mtot = np.array([dtot, rtot])
@@ -196,7 +201,7 @@ def plot_mopar_powerspec(t, mopars, plot_fname):
     pspec = pspec[:, 1:]
     f = f[1:]
 
-    plt.subplots(2, 1, figsize=(10, 5))
+    fig, axs = plt.subplots(2, 1, figsize=(10, 5))
     titles = ['Displacement (dB)', 'Rotation (dB)']
 
     for lc in range(0, 2):
@@ -209,12 +214,11 @@ def plot_mopar_powerspec(t, mopars, plot_fname):
         else:
             p_db = 10.0 * np.log10(p / np.max(p))
 
-        plt.subplot(2, 1, lc+1)
-        plt.plot(f, p_db)
-        plt.title(titles[lc], loc='left')
+        axs[lc].plot(f, p_db)
+        axs[lc].set_title(titles[lc], loc='left')
 
     # Add x axis label to last subplot
-    plt.xlabel('Frequency (Hz)')
+    axs[1].set_xlabel('Frequency (Hz)')
 
     # Space subplots without title overlap
     plt.tight_layout()

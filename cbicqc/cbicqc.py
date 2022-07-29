@@ -44,6 +44,7 @@ import nibabel as nb
 import datetime as dt
 import pandas as pd
 from glob import glob
+from pathlib import Path
 
 import bids
 
@@ -54,7 +55,7 @@ from .graphics import (plot_roi_timeseries, plot_roi_powerspec,
                        roi_demeaned_ts)
 from .rois import register_template, make_rois
 from .metrics import signal_metrics, moco_metrics
-from .moco import moco_phantom, moco_live
+from .moco import moco_phantom, moco_live, moco_postprocess
 from .report import ReportPDF
 from .summary import Summarize
 
@@ -64,7 +65,7 @@ class CBICQC:
     def __init__(self, bids_dir, subject='', session='', mode='phantom', past_months=12, no_sessions=False):
 
         # Copy arguments into object
-        self._bids_dir = bids_dir
+        self._bids_dir = Path(bids_dir)
         self._subject = subject
         self._session = session
         self._mode = mode
@@ -84,26 +85,33 @@ class CBICQC:
         self._layout = None
 
         # Create work and report directories
-        self._work_dir = tempfile.mkdtemp()
-        self._report_dir = os.path.join(self._bids_dir, 'derivatives', 'cbicqc')
-        os.makedirs(self._report_dir, exist_ok=True)
+        # Individual subject/session folders created during runtime
+        self._work_dir = self._bids_dir / 'work' / 'cbicqc'
+        self._report_dir = self._bids_dir / 'derivatives' / 'cbicqc'
 
-        # Intermediate filenames
+        # Declare subject/session specific work and report directories
+        self._subj_work_dir = None
+        self._subj_report_dir = None
+
+        # Report filenames in derivatives
         self._report_pdf = ''
         self._report_json = ''
-        self._tmean_fname = os.path.join(self._report_dir, 'tmean.nii.gz')
-        self._tsd_fname = os.path.join(self._report_dir, 'tsd.nii.gz')
-        self._tsfnr_fname = os.path.join(self._report_dir, 'tsfnr.nii.gz')
-        self._roi_labels_fname = os.path.join(self._report_dir, 'roi_labels.nii.gz')
 
-        self._roi_ts_png = os.path.join(self._work_dir, 'roi_timeseries.png')
-        self._roi_ps_png = os.path.join(self._work_dir, 'roi_powerspec.png')
-        self._mopar_ts_png = os.path.join(self._work_dir, 'mopar_timeseries.png')
-        self._mopar_pspec_png = os.path.join(self._work_dir, 'mopar_powerspec.png')
-        self._tmean_montage_png = os.path.join(self._work_dir, 'tmean_montage.png')
-        self._tsd_montage_png = os.path.join(self._work_dir, 'tsd_montage.png')
-        self._rois_montage_png = os.path.join(self._work_dir, 'rois_montage.png')
-        self._rois_demeaned_png = os.path.join(self._work_dir, 'rois_demeaned.png')
+        # Working directory intermediate filenames
+        self._tmean_fname = 'tmean.nii.gz'
+        self._tsd_fname = 'tsd.nii.gz'
+        self._tsfnr_fname = 'tsfnr.nii.gz'
+        self._roi_labels_fname = 'roi_labels.nii.gz'
+
+        # Working directory report images
+        self._roi_ts_png = 'roi_timeseries.png'
+        self._roi_ps_png = 'roi_powerspec.png'
+        self._mopar_ts_png = 'mopar_timeseries.png'
+        self._mopar_pspec_png = 'mopar_powerspec.png'
+        self._tmean_montage_png = 'tmean_montage.png'
+        self._tsd_montage_png = 'tsd_montage.png'
+        self._rois_montage_png = 'rois_montage.png'
+        self._rois_demeaned_png = 'rois_demeaned.png'
 
         # Flags
         self._save_intermediates = True
@@ -137,10 +145,17 @@ class CBICQC:
             # Parse image filename for BIDS keys
             bids_dict = bids.layout.parse_file_entities(epits_fpath)
             self._this_subject = bids_dict['subject']
+
             if 'session' in bids_dict:
                 self._this_session = bids_dict['session']
             else:
                 self._this_session = 'None'
+
+            # Create subj/sess specific working and report directories
+            self._subj_work_dir = self._work_dir / f'sub-{self._this_subject}' / f'ses-{self._this_session}'
+            os.makedirs(self._subj_work_dir, exist_ok=True)
+            self._subj_report_dir = self._report_dir / f'sub-{self._this_subject}' / f'ses-{self._this_session}'
+            os.makedirs(self._subj_report_dir, exist_ok=True)
 
             # Extract EPI timeseries stub from file path
             epits_stub = os.path.basename(epits_fpath).replace('.nii.gz', '')
@@ -149,16 +164,13 @@ class CBICQC:
             print('    EPI timeseries {}'.format(epits_stub))
 
             # Report PDF and JSON filenames - used in both report and summarize modes
-            self._report_pdf = os.path.join(
-                self._report_dir,
-                '{}_qc.pdf'.format(epits_stub)
-            )
-            self._report_json = self._report_pdf.replace('.pdf', '.json')
+            self._report_pdf = self._subj_report_dir / f'{epits_stub}_qc.pdf'
+            self._report_json = self._subj_report_dir / f'{epits_stub}_qc.json'
 
             if os.path.isfile(self._report_pdf) and os.path.isfile(self._report_json):
 
                 # QC analysis and reporting already run
-                print('      Report and metadata detected for this session')
+                print('      Report and metadata detected for this session - skipping')
 
             else:
 
@@ -186,8 +198,8 @@ class CBICQC:
                 print('* A QC trend summary cannot be generated from deidentified data')
 
 
-        # Cleanup temporary QC directory
-        self.cleanup()
+        # Cleanup work directory
+        self.cleanup(retain=True)
 
     def _analyze_and_report(self):
 
@@ -231,7 +243,7 @@ class CBICQC:
 
         print('      Starting {} motion correction'.format(self._mode))
         t0 = dt.datetime.now()
-        epits_moco_nii, epits_moco_pars = self._moco(epits_nii, skip=skip_moco)
+        epits_moco_nii, epits_moco_df = self._moco(epits_nii, meta, skip=skip_moco)
         t1 = dt.datetime.now()
         print('      Completed motion correction in {} seconds'.format((t1 - t0).seconds))
 
@@ -241,7 +253,7 @@ class CBICQC:
 
         # Register labels to temporal mean via template image
         print('      Register labels to temporal mean image')
-        labels_nii = register_template(tmean_nii, self._work_dir, mode=self._mode)
+        labels_nii = register_template(tmean_nii, self._subj_work_dir, mode=self._mode)
 
         # Generate ROIs from labels
         # Construct Nyquist Ghost and airspace ROIs from labels
@@ -258,8 +270,8 @@ class CBICQC:
         # Calculate signal metrics
         metrics = signal_metrics(fit_results, tsfnr_nii, rois_nii)
 
-        # Add motion metrics to metrics dictionary
-        metrics.update(moco_metrics(epits_moco_pars))
+        # Add motion metrics dictionary
+        metrics.update(moco_metrics(epits_moco_df))
 
         # Add image meta data into metrics dictionary
         metrics.update(meta)
@@ -270,59 +282,65 @@ class CBICQC:
         print('      Generating Report')
 
         # Create report images
-        plot_roi_timeseries(t, s_mean_t, s_detrend_t, s_fit_t, self._roi_ts_png)
-        plot_roi_powerspec(t, s_detrend_t, self._roi_ps_png)
-        plot_mopar_timeseries(t, epits_moco_pars, self._mopar_ts_png)
-        plot_mopar_powerspec(t, epits_moco_pars, self._mopar_pspec_png)
-        roi_demeaned_ts(epits_moco_nii, rois_nii, self._rois_demeaned_png)
-        orthoslices(tmean_nii, self._tmean_montage_png, cmap='gray', irng='robust')
-        orthoslices(tsd_nii, self._tsd_montage_png, cmap='viridis', irng='robust')
-        orthoslices(rois_nii, self._rois_montage_png, cmap='Pastel1', irng='noscale')
+        plot_roi_timeseries(t, s_mean_t, s_detrend_t, s_fit_t, self._subj_work_dir / self._roi_ts_png)
+        plot_roi_powerspec(t, s_detrend_t, self._subj_work_dir / self._roi_ps_png)
+        plot_mopar_timeseries(epits_moco_df, self._subj_work_dir / self._mopar_ts_png)
+        plot_mopar_powerspec(epits_moco_df, self._subj_work_dir / self._mopar_pspec_png)
+        roi_demeaned_ts(epits_moco_nii, rois_nii, self._subj_work_dir / self._rois_demeaned_png)
+        orthoslices(tmean_nii, self._subj_work_dir / self._tmean_montage_png, cmap='gray', irng='robust')
+        orthoslices(tsd_nii, self._subj_work_dir / self._tsd_montage_png, cmap='viridis', irng='robust')
+        orthoslices(rois_nii, self._subj_work_dir / self._rois_montage_png, cmap='Pastel1', irng='noscale')
 
         # OPTIONAL: Save intermediate images
         if self._save_intermediates:
-            nb.save(tmean_nii, self._tmean_fname)
-            nb.save(tsd_nii, self._tsd_fname)
-            nb.save(rois_nii, self._roi_labels_fname)
-            nb.save(tsfnr_nii, self._tsfnr_fname)
+            nb.save(tmean_nii, self._subj_work_dir / self._tmean_fname)
+            nb.save(tsd_nii, self._subj_work_dir / self._tsd_fname)
+            nb.save(rois_nii, self._subj_work_dir / self._roi_labels_fname)
+            nb.save(tsfnr_nii, self._subj_work_dir / self._tsfnr_fname)
 
         # Construct filename dictionary to pass to PDF generator
-        fnames = dict(WorkDir=self._work_dir,
+        fnames = dict(WorkDir=self._subj_work_dir,
                       ReportPDF=self._report_pdf,
                       ReportJSON=self._report_json,
-                      ROITimeseries=self._roi_ts_png,
-                      ROIPowerspec=self._roi_ps_png,
-                      MoparTimeseries=self._mopar_ts_png,
-                      MoparPowerspec=self._mopar_pspec_png,
-                      TMeanMontage=self._tmean_montage_png,
-                      TSDMontage=self._tsd_montage_png,
-                      ROIsMontage=self._rois_montage_png,
-                      ROIDemeanedTS=self._rois_demeaned_png,
-                      TMean=self._tmean_fname,
-                      TSD=self._tsd_fname,
-                      ROILabels=self._roi_labels_fname)
+                      ROITimeseries=self._subj_work_dir / self._roi_ts_png,
+                      ROIPowerspec=self._subj_work_dir / self._roi_ps_png,
+                      MoparTimeseries=self._subj_work_dir / self._mopar_ts_png,
+                      MoparPowerspec=self._subj_work_dir / self._mopar_pspec_png,
+                      TMeanMontage=self._subj_work_dir / self._tmean_montage_png,
+                      TSDMontage=self._subj_work_dir / self._tsd_montage_png,
+                      ROIsMontage=self._subj_work_dir / self._rois_montage_png,
+                      ROIDemeanedTS=self._subj_work_dir / self._rois_demeaned_png,
+                      TMean=self._subj_work_dir / self._tmean_fname,
+                      TSD=self._subj_work_dir / self._tsd_fname,
+                      ROILabels=self._subj_work_dir / self._roi_labels_fname)
 
         # Build PDF report
         ReportPDF(fnames, meta, metrics)
 
-    def cleanup(self, skip=False):
+    def cleanup(self, retain=False):
 
-        if skip:
+        if retain:
             print('')
-            print('Retaining {}'.format(self._work_dir))
+            print(f'Retaining {self._work_dir}')
         else:
             print('')
-            print('Deleting work directory')
+            print(f'Deleting work directory {self._work_dir}')
             shutil.rmtree(self._work_dir)
 
-    def _moco(self, img_nii, skip=False):
+    def _moco(self, img_nii, meta, skip=False):
         """
         Motion correction wrapper
 
-        :param img_nii: Nifti, image object
-        :param skip: bool, skip motion correction
-        :return moco_nii: Nifti, motion corrected image object
-        :return moco_pars: array, motion parameter timeseries
+        :param img_nii: Nifti
+            Nifit image object
+        :param meta: dict
+            BIDS sidecar metadata for BOLD series image
+        :param skip: bool
+            Skip motion correction flag
+        :return moco_nii: Nifti
+            Motion corrected image object
+        :return moco_df: dataframe
+            Motion parameter table
         """
 
         if skip:
@@ -338,14 +356,19 @@ class CBICQC:
 
             elif 'live' in self._mode:
 
-                moco_nii, moco_pars = moco_live(img_nii, self._work_dir)
+                moco_nii, moco_pars = moco_live(img_nii, self._subj_work_dir)
 
             else:
 
                 print('      * Unknown QC mode ({})'.format(self._mode))
                 sys.exit(1)
 
-        return moco_nii, moco_pars
+        # Post-process raw motion parameters
+        # - convert numpy array to pandas dataframe with time column
+        # - calculate Power FD and LPF FD and add to dataframe
+        moco_df = moco_postprocess(moco_pars, meta)
+
+        return moco_nii, moco_df
 
     def _get_metrics(self):
 

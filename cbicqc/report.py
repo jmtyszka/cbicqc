@@ -175,8 +175,12 @@ class ReportPDF:
         self._contents.append(Spacer(1, 0.25 * inch))
 
         # Add motion metrics subsection
-        motion_metrics = [['Mean FD', '{:0.3f} mm'.format(self._metrics['MeanFD'])],
-                          ['Max FD', '{:0.3f} mm'.format(self._metrics['MaxFD'])]]
+        motion_metrics = [
+            ['FD (median)', '{:0.3f} mm'.format(self._metrics['FD_p50'])],
+            ['FD (95th perc)', '{:0.3f} mm'.format(self._metrics['FD_p95'])],
+            ['LPF FD (median)', '{:0.3f} mm'.format(self._metrics['FD_LPF_p50'])],
+            ['LPF FD (95th perc)', '{:0.3f} mm'.format(self._metrics['FD_LPF_p95'])],
+        ]
 
         ptext = '<font size=11><b>Motion</b></font>'
         self._contents.append(Paragraph(ptext, self._pstyles['Justify']))

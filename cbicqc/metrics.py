@@ -119,64 +119,20 @@ def calc_tsfnr(tsfnr_nii, rois_nii):
     return np.mean(tsfnr_img[rois_img == 3])
 
 
-def moco_metrics(moco_pars):
-
-    # Calculate framewise displacement timecourse from moco_pars
-    fd = calc_fd(moco_pars)
+def moco_metrics(moco_df):
 
     # Create and fill metrics dictionary
     metrics = dict()
 
-    metrics['MeanFD'] = fd.mean()
-    metrics['MaxFD'] = fd.max()
+    # Median and 95th percentile of unfiltered FD
+    metrics['FD_p50'] = moco_df['FD_mm'].quantile(0.5)
+    metrics['FD_p95'] = moco_df['FD_mm'].quantile(0.95)
+
+    # Median and 95th percentile of LPF FD
+    metrics['FD_LPF_p50'] = moco_df['FD_LPF_mm'].quantile(0.5)
+    metrics['FD_LPF_p95'] = moco_df['FD_LPF_mm'].quantile(0.95)
 
     return metrics
-
-
-def calc_fd(mcf):
-    """
-    Calculate conventional FD from 6-column FSL MCFLIRT motion parameters
-
-    Reference:
-    J. D. Power, K. A. Barnes, A. Z. Snyder, B. L. Schlaggar, and S. E. Petersen,
-    “Spurious but systematic correlations in functional connectivity MRI networks arise from subject motion,”
-    Neuroimage, vol. 59, pp. 2142–2154, Feb. 2012, doi: 10.1016/j.neuroimage.2011.10.018. [Online].
-    Available: http://dx.doi.org/10.1016/j.neuroimage.2011.10.018
-    """
-
-    # Rotations (radians)
-    rx = mcf[:, 0]
-    ry = mcf[:, 1]
-    rz = mcf[:, 2]
-
-    # Translations (mm)
-    tx = mcf[:, 3]
-    ty = mcf[:, 4]
-    tz = mcf[:, 5]
-
-    # Backward differences (forward difference + leading 0)
-
-    drx = np.insert(np.diff(rx), 0, 0)
-    dry = np.insert(np.diff(ry), 0, 0)
-    drz = np.insert(np.diff(rz), 0, 0)
-
-    dtx = np.insert(np.diff(tx), 0, 0)
-    dty = np.insert(np.diff(ty), 0, 0)
-    dtz = np.insert(np.diff(tz), 0, 0)
-
-    # Total framewise displacement (Power 2012)
-
-    r_sphere = 50.0  # mm
-
-    FD = (np.abs(dtx) +
-          np.abs(dty) +
-          np.abs(dtz) +
-          np.abs(r_sphere * drx) +
-          np.abs(r_sphere * dry) +
-          np.abs(r_sphere * drz)
-          )
-
-    return FD
 
 
 
