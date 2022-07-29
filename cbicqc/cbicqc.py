@@ -91,8 +91,8 @@ class CBICQC:
         self._report_dir = self._bids_dir / 'derivatives' / 'cbicqc'
 
         # Declare subject/session specific work and report directories
-        self._subj_work_dir = None
-        self._subj_report_dir = None
+        self._epits_work_dir = None
+        self._epits_report_dir = None
 
         # Report filenames in derivatives
         self._report_pdf = ''
@@ -152,21 +152,21 @@ class CBICQC:
             else:
                 self._this_session = 'None'
 
-            # Create subj/sess specific working and report directories
-            self._subj_work_dir = self._work_dir / f'sub-{self._this_subject}' / f'ses-{self._this_session}'
-            os.makedirs(self._subj_work_dir, exist_ok=True)
-            self._subj_report_dir = self._report_dir / f'sub-{self._this_subject}' / f'ses-{self._this_session}'
-            os.makedirs(self._subj_report_dir, exist_ok=True)
+            # Extract EPI series prefix (basename without extensions)
+            epits_prefix = os.path.basename(epits_fpath).replace('.nii.gz', '').replace('.nii', '')
 
-            # Extract EPI timeseries stub from file path
-            epits_stub = os.path.basename(epits_fpath).replace('.nii.gz', '')
+            # Create work and report folders for this EPI timeseries
+            self._epits_work_dir = self._work_dir / epits_prefix
+            os.makedirs(self._epits_work_dir, exist_ok=True)
+            self._epits_report_dir = self._report_dir / epits_prefix
+            os.makedirs(self._epits_report_dir, exist_ok=True)
 
             print('')
-            print('    EPI timeseries {}'.format(epits_stub))
+            print('    EPI timeseries {}'.format(epits_prefix))
 
             # Report PDF and JSON filenames - used in both report and summarize modes
-            self._report_pdf = self._subj_report_dir / f'{epits_stub}_qc.pdf'
-            self._report_json = self._subj_report_dir / f'{epits_stub}_qc.json'
+            self._report_pdf = self._epits_report_dir / f'{epits_prefix}_qc.pdf'
+            self._report_json = self._epits_report_dir / f'{epits_prefix}_qc.json'
 
             if os.path.isfile(self._report_pdf) and os.path.isfile(self._report_json):
 
@@ -254,7 +254,7 @@ class CBICQC:
 
         # Register labels to temporal mean via template image
         print('      Register labels to temporal mean image')
-        labels_nii = register_template(tmean_nii, self._subj_work_dir, mode=self._mode)
+        labels_nii = register_template(tmean_nii, self._epits_work_dir, mode=self._mode)
 
         # Generate ROIs from labels
         # Construct Nyquist Ghost and airspace ROIs from labels
@@ -283,37 +283,37 @@ class CBICQC:
         print('      Generating Report')
 
         # Create report images
-        plot_roi_timeseries(t, s_mean_t, s_detrend_t, s_fit_t, self._subj_work_dir / self._roi_ts_png)
-        plot_roi_powerspec(t, s_detrend_t, self._subj_work_dir / self._roi_ps_png)
-        plot_mopar_timeseries(epits_moco_df, self._subj_work_dir / self._mopar_ts_png)
-        plot_mopar_powerspec(epits_moco_df, self._subj_work_dir / self._mopar_pspec_png)
-        roi_demeaned_ts(epits_moco_nii, rois_nii, self._subj_work_dir / self._rois_demeaned_png)
-        orthoslices(tmean_nii, self._subj_work_dir / self._tmean_montage_png, cmap='gray', irng='robust')
-        orthoslices(tsd_nii, self._subj_work_dir / self._tsd_montage_png, cmap='viridis', irng='robust')
-        orthoslices(rois_nii, self._subj_work_dir / self._rois_montage_png, cmap='Pastel1', irng='noscale')
+        plot_roi_timeseries(t, s_mean_t, s_detrend_t, s_fit_t, self._epits_work_dir / self._roi_ts_png)
+        plot_roi_powerspec(t, s_detrend_t, self._epits_work_dir / self._roi_ps_png)
+        plot_mopar_timeseries(epits_moco_df, self._epits_work_dir / self._mopar_ts_png)
+        plot_mopar_powerspec(epits_moco_df, self._epits_work_dir / self._mopar_pspec_png)
+        roi_demeaned_ts(epits_moco_nii, rois_nii, self._epits_work_dir / self._rois_demeaned_png)
+        orthoslices(tmean_nii, self._epits_work_dir / self._tmean_montage_png, cmap='gray', irng='robust')
+        orthoslices(tsd_nii, self._epits_work_dir / self._tsd_montage_png, cmap='viridis', irng='robust')
+        orthoslices(rois_nii, self._epits_work_dir / self._rois_montage_png, cmap='Pastel1', irng='noscale')
 
         # OPTIONAL: Save intermediate images
         if self._save_intermediates:
-            nb.save(tmean_nii, self._subj_work_dir / self._tmean_fname)
-            nb.save(tsd_nii, self._subj_work_dir / self._tsd_fname)
-            nb.save(rois_nii, self._subj_work_dir / self._roi_labels_fname)
-            nb.save(tsfnr_nii, self._subj_work_dir / self._tsfnr_fname)
+            nb.save(tmean_nii, self._epits_work_dir / self._tmean_fname)
+            nb.save(tsd_nii, self._epits_work_dir / self._tsd_fname)
+            nb.save(rois_nii, self._epits_work_dir / self._roi_labels_fname)
+            nb.save(tsfnr_nii, self._epits_work_dir / self._tsfnr_fname)
 
         # Construct filename dictionary to pass to PDF generator
-        fnames = dict(WorkDir=self._subj_work_dir,
+        fnames = dict(WorkDir=self._epits_work_dir,
                       ReportPDF=self._report_pdf,
                       ReportJSON=self._report_json,
-                      ROITimeseries=self._subj_work_dir / self._roi_ts_png,
-                      ROIPowerspec=self._subj_work_dir / self._roi_ps_png,
-                      MoparTimeseries=self._subj_work_dir / self._mopar_ts_png,
-                      MoparPowerspec=self._subj_work_dir / self._mopar_pspec_png,
-                      TMeanMontage=self._subj_work_dir / self._tmean_montage_png,
-                      TSDMontage=self._subj_work_dir / self._tsd_montage_png,
-                      ROIsMontage=self._subj_work_dir / self._rois_montage_png,
-                      ROIDemeanedTS=self._subj_work_dir / self._rois_demeaned_png,
-                      TMean=self._subj_work_dir / self._tmean_fname,
-                      TSD=self._subj_work_dir / self._tsd_fname,
-                      ROILabels=self._subj_work_dir / self._roi_labels_fname)
+                      ROITimeseries=self._epits_work_dir / self._roi_ts_png,
+                      ROIPowerspec=self._epits_work_dir / self._roi_ps_png,
+                      MoparTimeseries=self._epits_work_dir / self._mopar_ts_png,
+                      MoparPowerspec=self._epits_work_dir / self._mopar_pspec_png,
+                      TMeanMontage=self._epits_work_dir / self._tmean_montage_png,
+                      TSDMontage=self._epits_work_dir / self._tsd_montage_png,
+                      ROIsMontage=self._epits_work_dir / self._rois_montage_png,
+                      ROIDemeanedTS=self._epits_work_dir / self._rois_demeaned_png,
+                      TMean=self._epits_work_dir / self._tmean_fname,
+                      TSD=self._epits_work_dir / self._tsd_fname,
+                      ROILabels=self._epits_work_dir / self._roi_labels_fname)
 
         # Build PDF report
         ReportPDF(fnames, meta, metrics)
@@ -357,7 +357,7 @@ class CBICQC:
 
             elif 'live' in self._mode:
 
-                moco_nii, moco_pars = moco_live(img_nii, self._subj_work_dir)
+                moco_nii, moco_pars = moco_live(img_nii, self._epits_work_dir)
 
             else:
 
