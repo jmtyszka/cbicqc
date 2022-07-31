@@ -242,7 +242,7 @@ class CBICQC:
         # Hardwired moco flag for debugging
         skip_moco = False
 
-        print('      Starting {} motion correction'.format(self._mode))
+        print(f"      Starting {self._mode} motion correction of {epits_nii.shape[3]} volumes")
         t0 = dt.datetime.now()
         epits_moco_nii, epits_moco_df = self._moco(epits_nii, meta, skip=skip_moco)
         t1 = dt.datetime.now()

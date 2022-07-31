@@ -35,9 +35,6 @@ import subprocess
 import pkg_resources
 import nibabel as nb
 import numpy as np
-from scipy.ndimage.morphology import (binary_dilation,
-                                      binary_erosion,
-                                      generate_binary_structure)
 
 
 def register_template(tmean_nii, work_dir, mode='phantom'):
@@ -75,10 +72,15 @@ def register_template(tmean_nii, work_dir, mode='phantom'):
             os.path.join('templates', 'fbirn_labels.nii.gz')
         )
     else:
-        dof = 12
+
+        # Temporary fix for scaling issues with partial brain (slab) EPI
+        # Any linear transform > rigid mis-estimates scaling with slab EPI
+        # TODO: Add support for SDC and WB intermediate registration
+        dof = 6
+
         template_fname = pkg_resources.resource_filename(
             __name__,
-            os.path.join('templates', 'mni_template.nii.gz')
+            os.path.join('templates', 'mni_template_brain.nii.gz')
         )
         labels_fname = pkg_resources.resource_filename(
             __name__,

@@ -144,8 +144,8 @@ class ReportPDF:
 
         signal_metrics = [['Mean Signal', '{:.1f}'.format(self._metrics['SignalMean'])],
                           ['SNR', '{:.1f}'.format(self._metrics['SNR'])],
-                          ['SFNR', '{:.1f}'.format(self._metrics['SFNR'])],
-                          ['SArtR', '{:.1f}'.format(self._metrics['SArtR'])],
+                          ['tSFNR', '{:.1f}'.format(self._metrics['tSFNR'])],
+                          ['Signal-to-Nyquist Ratio', '{:.1f}'.format(self._metrics['SNyqR'])],
                           ['Drift', '{:.3f} %/TR'.format(self._metrics['Drift'])],
                           ['Warmup Amplitude', '{:.3f} %'.format(self._metrics['WarmupAmp'])],
                           ['Warmup Time Constant', '{:.1f} TRs'.format(self._metrics['WarmupTime'])]

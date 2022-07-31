@@ -57,8 +57,8 @@ def signal_metrics(fit_results, tsfnr_nii, rois_nii):
 
     metrics['SignalMean'] = signal_mean
     metrics['SNR'] = signal_mean / air_mean
-    metrics['SFNR'] = tsfnr
-    metrics['SArtR'] = signal_mean / nyquist_mean
+    metrics['tSFNR'] = tsfnr
+    metrics['SNyqR'] = signal_mean / nyquist_mean
     metrics['Drift'] = signal_drift / signal_mean * 100
     metrics['WarmupAmp'] = signal_a_warm / signal_mean * 100
     metrics['WarmupTime'] = signal_t_warm
@@ -101,6 +101,8 @@ def spike_count(points, thresh=3.5):
 
 def calc_tsfnr(tsfnr_nii, rois_nii):
     """
+    Calculate spatial median of the tSFNR within the signal ROI
+
     ROI Label Key
     ----
     Undefined       = 0
@@ -116,7 +118,7 @@ def calc_tsfnr(tsfnr_nii, rois_nii):
     tsfnr_img = tsfnr_nii.get_data()
     rois_img = rois_nii.get_data()
 
-    return np.mean(tsfnr_img[rois_img == 3])
+    return np.median(tsfnr_img[rois_img == 3])
 
 
 def moco_metrics(moco_df):
