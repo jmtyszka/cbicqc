@@ -47,7 +47,6 @@ from glob import glob
 from pathlib import Path
 
 import bids
-bids.config.set_option('extension_initial_dot', True)
 
 from .timeseries import temporal_mean_sd, extract_timeseries, detrend_timeseries
 from .graphics import (plot_roi_timeseries, plot_roi_powerspec,
@@ -366,8 +365,8 @@ class CBICQC:
 
         # Post-process raw motion parameters
         # - convert numpy array to pandas dataframe with time column
-        # - calculate Power FD and LPF FD and add to dataframe
-        moco_df = moco_postprocess(moco_pars, meta)
+        # - calculate Power FD and LPF FD and add to dataframe (in vivo only)
+        moco_df = moco_postprocess(moco_pars, meta, mode=self._mode)
 
         return moco_nii, moco_df
 
@@ -385,14 +384,14 @@ class CBICQC:
 
     def _get_epits_list(self):
 
+        # Force magnitude-only quality control
         # Check for presence of BOLD phase images. If they're present, add part-mag tag
         # to avoid running CBICQC on phase images (which won't work)
+        print('Magnitude image quality control')
         phase_list = glob(os.path.join(self._bids_dir, 'sub-*', 'ses-*', 'func', '*part-phase*_bold.nii*'))
         if len(phase_list) > 0:
-            print('* EPI phase images detected - selecting magnitude images only')
             part_tag = 'part-mag*'
         else:
-            print('No EPI phase images detected - assuming magnitude images only')
             part_tag = ''
 
         if self._no_sessions:

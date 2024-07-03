@@ -135,7 +135,7 @@ def make_rois(labels_nii):
     """
 
     # Extract integer-valued label image
-    labels_img = labels_nii.get_data().astype(np.uint)
+    labels_img = labels_nii.get_fdata().astype(np.uint)
 
     buffer_mask = (labels_img > 0).astype(np.uint8)
     signal_mask = (labels_img > 1).astype(np.uint8)

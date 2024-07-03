@@ -49,7 +49,7 @@ def moco_phantom(img_nii):
         Motion parameter array (nt x 6)
     """
 
-    img = img_nii.get_data()
+    img = img_nii.get_fdata()
     nt = img.shape[3]
     vox_mm = img_nii.header.get('pixdim')[1:4]
 
@@ -168,7 +168,7 @@ def total_rotation(rot):
     return phi_tot
 
 
-def moco_postprocess(moco_pars, meta):
+def moco_postprocess(moco_pars, meta, mode='phantom'):
 
     # Dataframe column names
     column_names = [
@@ -189,7 +189,11 @@ def moco_postprocess(moco_pars, meta):
     t = np.arange(0, nt).reshape(-1, 1) * TR_s
 
     # Calculate FD variants
-    fd, fd_lpf = calc_fd(moco_pars, TR_s)
+    if mode == 'phantom':
+        # Do not calculate FD and LPF FD for phantom QC
+        fd, fd_lpf = np.zeros((nt, 1)), np.zeros((nt, 1))
+    else:
+        fd, fd_lpf = calc_fd(moco_pars, TR_s)
 
     # Create and fill numpy array
     moco_arr = np.hstack((t, moco_pars, fd, fd_lpf))

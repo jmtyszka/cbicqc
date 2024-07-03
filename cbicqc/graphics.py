@@ -236,7 +236,7 @@ def plot_mopar_powerspec(moco_df, plot_fname):
 
 def orthoslices(img_nii, ortho_fname, cmap='viridis', irng='default'):
 
-    img3d = img_nii.get_data()
+    img3d = img_nii.get_fdata()
 
     # Intensity scaling
     if 'robust' in irng:
@@ -304,7 +304,7 @@ def orthoslice_montage(img_nii, montage_fname, cmap='viridis', irng='default'):
 
     orient_name = ['Axial', 'Coronal', 'Sagittal']
 
-    img3d = img_nii.get_data()
+    img3d = img_nii.get_fdata()
 
     plt.subplots(1, 3, figsize=(7, 2.4))
 
@@ -354,6 +354,9 @@ def orthoslice_montage(img_nii, montage_fname, cmap='viridis', irng='default'):
 
 def roi_demeaned_ts(img_nii, rois_nii, residuals_fname):
     """
+    TODO: Switch to ROI slice carpet plot (slices x time)
+    TODO: Calculate mean signal within ROI for each slice and plot over time
+
     Create temporal-spatial image of demeaned voxel timecourse
     - one graymap per ROI
     - subsample voxels in each ROI to yield n_samp timeseries
@@ -369,8 +372,8 @@ def roi_demeaned_ts(img_nii, rois_nii, residuals_fname):
 
     roi_name = ['Air', 'Nyquist Ghost', 'Signal']
 
-    rois = rois_nii.get_data()
-    s = img_nii.get_data()
+    rois = rois_nii.get_fdata()
+    s = img_nii.get_fdata()
 
     # Number of time points and labels
     nt = s.shape[3]

@@ -115,8 +115,8 @@ def calc_tsfnr(tsfnr_nii, rois_nii):
     :return:
     """
 
-    tsfnr_img = tsfnr_nii.get_data()
-    rois_img = rois_nii.get_data()
+    tsfnr_img = tsfnr_nii.get_fdata()
+    rois_img = rois_nii.get_fdata()
 
     return np.median(tsfnr_img[rois_img == 3])
 

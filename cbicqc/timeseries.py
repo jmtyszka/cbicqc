@@ -31,7 +31,7 @@ import nibabel as nb
 
 def temporal_mean_sd(qc_moco_nii):
 
-    qc = qc_moco_nii.get_data()
+    qc = qc_moco_nii.get_fdata()
 
     # Temporal mean of 4D timeseries
     tmean = np.mean(qc, axis=3)
@@ -47,8 +47,8 @@ def temporal_mean_sd(qc_moco_nii):
 
 def extract_timeseries(qc_moco_nii, rois_nii):
 
-    rois = rois_nii.get_data()
-    s = qc_moco_nii.get_data()
+    rois = rois_nii.get_fdata()
+    s = qc_moco_nii.get_fdata()
 
     # Number of time points
     nt = s.shape[3]
