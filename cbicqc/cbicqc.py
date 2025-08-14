@@ -37,7 +37,6 @@ SOFTWARE.
 import os
 import sys
 import json
-import tempfile
 import shutil
 import numpy as np
 import nibabel as nb

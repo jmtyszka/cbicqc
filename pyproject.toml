@@ -1,0 +1,29 @@
+[project]
+name = "cbicqc"
+version = "2025.8.12"
+description = "Lightweight EPI quality control tool"
+authors = [
+    {name = "Mike Tyszka",email = "jmt@caltech.edu"}
+]
+license = {text = "MIT"}
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    'pydicom>=1.2.2',
+    'numpy>=1.15.2',
+    'scipy',
+    'pybids',
+    'nibabel',
+    'nipype',
+    'reportlab',
+    'scikit-image',
+    'scikit-learn>=0.24',
+    'statsmodels>=0.9.0',
+    'pynetdicom>=1.2.0',
+    'pandas',
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
