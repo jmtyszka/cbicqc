@@ -72,7 +72,7 @@ class CBICQC:
         self._no_sessions = no_sessions
 
         # Phantom or in vivo suffix ('T2star' or 'bold')
-        self._suffix = 'T2star' if 'phantom' in mode else 'bold'
+        self._suffix = 'epi' if 'phantom' in mode else 'bold'
 
         # Batch subject/session ids
         self._this_subject = ''
