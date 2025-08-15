@@ -71,8 +71,8 @@ class CBICQC:
         self._past_months = past_months
         self._no_sessions = no_sessions
 
-        # Phantom or in vivo suffix ('T2star' or 'bold')
-        self._suffix = 'epi' if 'phantom' in mode else 'bold'
+        # Use _bold suffix for both phantom and in vivo QC
+        self._suffix = 'bold'
 
         # Batch subject/session ids
         self._this_subject = ''
@@ -130,75 +130,78 @@ class CBICQC:
         # TODO: Broaden search for non-BOLD series
         epits_list = self._get_epits_list()
 
-        if len(epits_list) < 1:
-            print(f'*** No EPI timeseries found in {self._bids_dir}')
+        if len(epits_list) > 0:
 
-        # Init list of session metrics for this subject
-        metric_list = []
+            # Init list of session metrics for this subject
+            metric_list = []
 
-        # Loop over all EPI timeseries images
-        for epits_fpath in epits_list:
+            # Loop over all EPI timeseries images
+            for epits_fpath in epits_list:
 
-            self._this_epits_fpath = epits_fpath
+                self._this_epits_fpath = epits_fpath
 
-            # Parse image filename for BIDS keys
-            bids_dict = bids.layout.parse_file_entities(epits_fpath)
-            self._this_subject = bids_dict['subject']
+                # Parse image filename for BIDS keys
+                bids_dict = bids.layout.parse_file_entities(epits_fpath)
+                self._this_subject = bids_dict['subject']
 
-            if 'session' in bids_dict:
-                self._this_session = bids_dict['session']
-            else:
-                self._this_session = 'None'
+                if 'session' in bids_dict:
+                    self._this_session = bids_dict['session']
+                else:
+                    self._this_session = 'None'
 
-            # Extract EPI series prefix (basename without extensions)
-            epits_prefix = os.path.basename(epits_fpath).replace('.nii.gz', '').replace('.nii', '')
+                # Extract EPI series prefix (basename without extensions)
+                epits_prefix = os.path.basename(epits_fpath).replace('.nii.gz', '').replace('.nii', '')
 
-            # Create work and report folders for this EPI timeseries
-            self._epits_work_dir = self._work_dir / epits_prefix
-            os.makedirs(self._epits_work_dir, exist_ok=True)
-            self._epits_report_dir = self._report_dir / epits_prefix
-            os.makedirs(self._epits_report_dir, exist_ok=True)
+                # Create work and report folders for this EPI timeseries
+                self._epits_work_dir = self._work_dir / epits_prefix
+                os.makedirs(self._epits_work_dir, exist_ok=True)
+                self._epits_report_dir = self._report_dir / epits_prefix
+                os.makedirs(self._epits_report_dir, exist_ok=True)
 
-            print('')
-            print('    EPI timeseries {}'.format(epits_prefix))
-
-            # Report PDF and JSON filenames - used in both report and summarize modes
-            self._report_pdf = self._epits_report_dir / f'{epits_prefix}_qc.pdf'
-            self._report_json = self._epits_report_dir / f'{epits_prefix}_qc.json'
-
-            if os.path.isfile(self._report_pdf) and os.path.isfile(self._report_json):
-
-                # QC analysis and reporting already run
-                print('      Report and metadata detected for this session - skipping')
-
-            else:
-
-                # QC analysis and report generation
-                self._analyze_and_report()
-
-            # Add metrics for this subject/session to cumulative list
-            metric_list.append(self._get_metrics())
-
-        # Convert metric list to dataframe and save to file
-        self._metrics_df = pd.DataFrame(metric_list)
-
-        # Generate summary report for phantom QC only
-        if 'phantom' in self._mode:
-
-            # Check for deidentified BIDS data
-            # dcm2niix with anonymization on by default generates AcquisitionTime but not AcquisitionDateTime
-            # Use "bidskit --no-anon" to skip deidentification and generate AcquisitionDataTime in the JSON sidecars
-            if 'AcquisitionDateTime' in self._metrics_df:
-                Summarize(self._report_dir, self._metrics_df, self._past_months)
-            else:
                 print('')
-                print('* AcquisitionDateTime is missing from the BIDS metadata')
-                print('* The most likely cause of this is deidentification of the data by dcm2niix or bidskit')
-                print('* A QC trend summary cannot be generated from deidentified data')
+                print('    EPI timeseries {}'.format(epits_prefix))
+
+                # Report PDF and JSON filenames - used in both report and summarize modes
+                self._report_pdf = self._epits_report_dir / f'{epits_prefix}_qc.pdf'
+                self._report_json = self._epits_report_dir / f'{epits_prefix}_qc.json'
+
+                if os.path.isfile(self._report_pdf) and os.path.isfile(self._report_json):
+
+                    # QC analysis and reporting already run
+                    print('      Report and metadata detected for this session - skipping')
+
+                else:
+
+                    # QC analysis and report generation
+                    self._analyze_and_report()
+
+                # Add metrics for this subject/session to cumulative list
+                metric_list.append(self._get_metrics())
+
+            # Convert metric list to dataframe and save to file
+            self._metrics_df = pd.DataFrame(metric_list)
+
+            # Generate summary report for phantom QC only
+            if 'phantom' in self._mode:
+
+                # Check for deidentified BIDS data
+                # dcm2niix with anonymization on by default generates AcquisitionTime but not AcquisitionDateTime
+                # Use "bidskit --no-anon" to skip deidentification and generate AcquisitionDataTime in the JSON sidecars
+                if 'AcquisitionDateTime' in self._metrics_df:
+                    Summarize(self._report_dir, self._metrics_df, self._past_months)
+                else:
+                    print('')
+                    print('* AcquisitionDateTime is missing from the BIDS metadata')
+                    print('* The most likely cause of this is deidentification of the data by dcm2niix or bidskit')
+                    print('* A QC trend summary cannot be generated from deidentified data')
 
 
-        # Cleanup work directory
-        self.cleanup(retain=True)
+            # Cleanup work directory
+            self.cleanup(retain=True)
+        
+        else:
+
+            print('* Nothing to do')
 
     def _analyze_and_report(self):
 
@@ -382,21 +385,29 @@ class CBICQC:
         return [os.path.basename(d).replace('sub-', '') for d in tmp_list]
 
     def _get_epits_list(self):
-
-        # Force magnitude-only quality control
+       
         # Check for presence of BOLD phase images. If they're present, add part-mag tag
         # to avoid running CBICQC on phase images (which won't work)
-        print('Magnitude image quality control')
-        phase_list = glob(os.path.join(self._bids_dir, 'sub-*', 'ses-*', 'func', '*part-phase*_bold.nii*'))
+        phase_list = glob(os.path.join(self._bids_dir, 'sub-*', 'ses-*', 'func', f'*part-phase*_{self._suffix}.nii*'))
         if len(phase_list) > 0:
+            print('* Phase images detected - forcing magnitude-only QC (part-mag)')
             part_tag = 'part-mag*'
         else:
             part_tag = ''
 
         if self._no_sessions:
-            epits_list = glob(os.path.join(self._bids_dir, 'sub-*', 'func', f'*{part_tag}*_bold.nii.gz'))
+            print('  Searching for images to QC - no sessions')
+            epits_list = glob(os.path.join(self._bids_dir, 'sub-*', 'func', f'*{part_tag}*_{self._suffix}.nii.gz'))
         else:
-            epits_list = glob(os.path.join(self._bids_dir, 'sub-*', 'ses-*', 'func', f'*{part_tag}_bold.nii.gz'))
+            print('  Searching for images to QC - sessions present')
+            epits_list = glob(os.path.join(self._bids_dir, 'sub-*', 'ses-*', 'func', f'*{part_tag}_{self._suffix}.nii.gz'))
+
+        n_imgs = len(epits_list)
+        if n_imgs > 0:
+            print(f'  Found {n_imgs} BOLD EPI images to QC')
+        else:
+            print(f'  * No images found')
+            print(f'  * Confirm 4D images are in func/ folders and have a _bold suffix')
 
         return epits_list
 
