@@ -1,6 +1,6 @@
 [project]
 name = "cbicqc"
-version = "2025.8.12"
+version = "2025.8.15"
 description = "Lightweight EPI quality control tool"
 authors = [
     {name = "Mike Tyszka",email = "jmt@caltech.edu"}
